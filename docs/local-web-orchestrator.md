@@ -100,6 +100,22 @@ The same summary is available as JSON at:
 http://127.0.0.1:8000/api/reports
 ```
 
+## Kill Switch And Incident Panel
+
+The home page includes a guided safety panel for:
+
+- current kill switch status and reason;
+- manual kill switch activation with a required reason;
+- kill switch clear after operator review;
+- latest incident drill status and scenario summary.
+
+The incident drill can be run from the Safe Actions section. The panel status is
+available as JSON at:
+
+```text
+http://127.0.0.1:8000/api/incident
+```
+
 ## Activity
 
 Every UI action writes an activity record to:

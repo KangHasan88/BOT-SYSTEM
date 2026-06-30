@@ -9,11 +9,13 @@ from trading_bot.orchestrator import (
     ACTIONS,
     build_orchestrator_page,
     load_health_summary,
+    load_incident_panel,
     load_orchestrator_status,
     load_report_browser,
     load_setup_wizard,
     recent_audit_events,
     run_orchestrator_action,
+    update_kill_switch_from_web,
 )
 from trading_bot.observability import JsonlAuditLogger
 
@@ -30,6 +32,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Build Dashboard", html)
         self.assertIn("Quick Setup", html)
         self.assertIn("Report Browser", html)
+        self.assertIn("Kill Switch & Incident", html)
         self.assertIn("No live order action is exposed", html)
         self.assertIn("Audit Timeline", html)
         self.assertNotIn("Buy", html)
@@ -84,10 +87,26 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Daily Journal", categories)
         self.assertTrue(all(report.path for report in reports))
 
+    def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+
+            activated = update_kill_switch_from_web("activate", "operator drill", config_path)
+            cleared = update_kill_switch_from_web("clear", "", config_path)
+            panel = load_incident_panel(config_path)
+
+        self.assertTrue(activated.kill_switch_active)
+        self.assertEqual("operator drill", activated.kill_switch_reason)
+        self.assertFalse(cleared.kill_switch_active)
+        self.assertEqual("MISSING", panel.incident_status)
+
     def test_action_registry_has_only_safe_commands(self) -> None:
         self.assertIn("run_cycle", ACTIONS)
         self.assertIn("sync_btc_15m", ACTIONS)
         self.assertIn("sync_eth_15m", ACTIONS)
+        self.assertIn("incident_drill", ACTIONS)
         rendered = " ".join(" ".join(command) for command in ACTIONS.values()).lower()
 
         self.assertNotIn("live-order", rendered)

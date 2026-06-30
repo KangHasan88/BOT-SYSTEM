@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from trading_bot.config import ConfigError, load_config
 from trading_bot.observability import AuditEvent, read_audit_events
-from trading_bot.safety import read_kill_switch
+from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kill_switch
 
 
 ACTIONS: dict[str, tuple[str, ...]] = {
@@ -21,6 +21,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
+    "incident_drill": ("incident-drill-report", "--config", "{config}"),
     "live_go_no_go": ("live-go-no-go-report", "--config", "{config}"),
     "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
@@ -82,6 +83,17 @@ class ReportItem:
     path: str
     updated_at_utc: str
     size_bytes: int
+
+
+@dataclass(frozen=True)
+class IncidentPanel:
+    kill_switch_active: bool
+    kill_switch_reason: str
+    kill_switch_created_at_utc: str
+    incident_status: str
+    incident_generated_at_utc: str
+    scenario_count: int
+    scenario_summary: str
 
 
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
@@ -164,6 +176,43 @@ def load_report_browser(config_path: str | Path = "config/bot.sample.toml") -> l
     reports.extend(_paper_report_items(root / "paper"))
     reports.extend(_json_report_items(root / "reports" / "daily", "Daily Journal", "*.json"))
     return sorted(reports, key=lambda item: item.updated_at_utc, reverse=True)
+
+
+def load_incident_panel(config_path: str | Path = "config/bot.sample.toml") -> IncidentPanel:
+    config = load_config(Path(config_path))
+    root = Path(config.data_root)
+    kill_switch = read_kill_switch(root)
+    report = _read_json(root / "qa" / "incident_drill" / "report.json") or {}
+    scenarios = report.get("scenarios", [])
+    scenario_names = []
+    if isinstance(scenarios, list):
+        for scenario in scenarios:
+            if isinstance(scenario, dict):
+                scenario_names.append(f"{scenario.get('name', 'unknown')}={scenario.get('status', 'UNKNOWN')}")
+    return IncidentPanel(
+        kill_switch_active=kill_switch.active,
+        kill_switch_reason=kill_switch.reason,
+        kill_switch_created_at_utc=kill_switch.created_at_utc or "",
+        incident_status=str(report.get("status", "MISSING")),
+        incident_generated_at_utc=str(report.get("generated_at_utc", "")),
+        scenario_count=len(scenario_names),
+        scenario_summary=", ".join(scenario_names) if scenario_names else "no incident drill report yet",
+    )
+
+
+def update_kill_switch_from_web(
+    action: str,
+    reason: str,
+    config_path: str | Path = "config/bot.sample.toml",
+) -> IncidentPanel:
+    config = load_config(Path(config_path))
+    if action == "activate":
+        activate_kill_switch(config.data_root, reason)
+    elif action == "clear":
+        clear_kill_switch(config.data_root)
+    else:
+        raise ValueError(f"unsupported kill switch action: {action}")
+    return load_incident_panel(config_path)
 
 
 def load_health_summary(config_path: str | Path = "config/bot.sample.toml") -> HealthSummary:
@@ -278,12 +327,14 @@ def build_orchestrator_page(
     health: HealthSummary | None = None,
     setup_checks: list[SetupCheck] | None = None,
     reports: list[ReportItem] | None = None,
+    incident: IncidentPanel | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
     health = health or HealthSummary("MISSING", "", "MISSING", "", "MISSING", "", "MISSING", "")
     setup_checks = setup_checks or []
     reports = reports or []
+    incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "no incident drill report yet")
     action_buttons = "".join(
         f'<button type="button" data-action="{escape(action)}" {"disabled" if status.action_running else ""}>{escape(_action_label(action))}</button>'
         for action in ACTIONS
@@ -293,6 +344,7 @@ def build_orchestrator_page(
     health_html = _health_html(health)
     setup_html = _setup_html(setup_checks)
     reports_html = _reports_html(reports)
+    incident_html = _incident_html(incident)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE ENABLED" if status.live_enabled else "Live Disabled"
     kill_text = "ACTIVE" if status.kill_switch_active else "Clear"
@@ -366,6 +418,16 @@ def build_orchestrator_page(
       <p class="small">Reports are read-only summaries from local paper/research files.</p>
     </section>
     <section class="panel">
+      <h2>Kill Switch & Incident</h2>
+      <div>{incident_html}</div>
+      <div class="filters">
+        <input id="kill-reason" placeholder="Reason required to activate">
+        <button type="button" id="kill-activate">Activate Kill Switch</button>
+        <button type="button" id="kill-clear">Clear Kill Switch</button>
+      </div>
+      <p class="small">Kill switch blocks bot cycles. Incident drill is available as a safe action above.</p>
+    </section>
+    <section class="panel">
       <h2>Safe Actions</h2>
       <label class="small" for="limit">Candle limit</label>
       <input id="limit" type="number" min="1" max="1000" value="10" style="width:100px; padding:8px; margin:0 0 10px 8px; border:1px solid var(--line); border-radius:6px;">
@@ -425,6 +487,22 @@ def build_orchestrator_page(
       document.getElementById('audit').innerHTML = payload.html;
     }}
     document.getElementById('audit-refresh').addEventListener('click', loadAudit);
+    async function postKillSwitch(action) {{
+      const reason = document.getElementById('kill-reason').value;
+      const res = await fetch('/api/kill-switch', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{action, reason}})
+      }});
+      if (!res.ok) {{
+        const payload = await res.json().catch(() => ({{error: 'request failed'}}));
+        alert(payload.error || 'request failed');
+        return;
+      }}
+      window.location.reload();
+    }}
+    document.getElementById('kill-activate').addEventListener('click', () => postKillSwitch('activate'));
+    document.getElementById('kill-clear').addEventListener('click', () => postKillSwitch('clear'));
     setInterval(() => fetch('/api/status').catch(() => null), 15000);
     setInterval(loadAudit, 30000);
   </script>
@@ -461,6 +539,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/reports":
                     self._json_response({"reports": [asdict(row) for row in load_report_browser(config_path)]})
                     return
+                if parsed.path == "/api/incident":
+                    self._json_response(asdict(load_incident_panel(config_path)))
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -486,7 +567,8 @@ def _handler_factory(config_path: Path):
                 health = load_health_summary(config_path)
                 setup = load_setup_wizard(config_path)
                 reports = load_report_browser(config_path)
-                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports))
+                incident = load_incident_panel(config_path)
+                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident))
             except (ConfigError, ValueError, OSError) as exc:
                 self._json_response({"error": str(exc)}, status=500)
 
@@ -494,6 +576,17 @@ def _handler_factory(config_path: Path):
             try:
                 parsed = urlparse(self.path)
                 if parsed.path != "/api/actions":
+                    if parsed.path == "/api/kill-switch":
+                        length = int(self.headers.get("Content-Length", "0"))
+                        raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+                        payload = json.loads(raw)
+                        panel = update_kill_switch_from_web(
+                            str(payload.get("action", "")),
+                            str(payload.get("reason", "")),
+                            config_path=config_path,
+                        )
+                        self._json_response(asdict(panel))
+                        return
                     self._json_response({"error": "not found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -673,6 +766,19 @@ def _reports_html(reports: list[ReportItem]) -> str:
         "<tbody>"
         + "".join(rows)
         + "</tbody></table>"
+    )
+
+
+def _incident_html(panel: IncidentPanel) -> str:
+    kill_css = "danger" if panel.kill_switch_active else "ok"
+    incident_css = _report_status_class(panel.incident_status)
+    return (
+        '<div class="grid">'
+        + _metric("Kill Switch", f'<span class="badge {kill_css}">{"ACTIVE" if panel.kill_switch_active else "CLEAR"}</span>')
+        + _metric("Kill Reason", panel.kill_switch_reason or "-")
+        + _metric("Incident Drill", f'<span class="badge {incident_css}">{escape(panel.incident_status)}</span>')
+        + _metric("Scenarios", f"{panel.scenario_count}: {panel.scenario_summary}")
+        + "</div>"
     )
 
 
