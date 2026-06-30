@@ -18,6 +18,28 @@ Then open:
 http://127.0.0.1:8000
 ```
 
+For the easier local launcher, double-click:
+
+```text
+start-bot-web.cmd
+```
+
+Or run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local-orchestrator.ps1
+```
+
+The launcher starts the web orchestrator in the background, writes logs to
+`work/orchestrator/`, stores the process id in `local-web.pid`, waits for
+`/api/setup`, and opens the browser when ready.
+
+To stop it:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orchestrator.ps1
+```
+
 ## Safe Actions
 
 - validate config;
