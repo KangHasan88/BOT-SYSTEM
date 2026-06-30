@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,7 @@ from trading_bot.orchestrator import (
     build_orchestrator_page,
     load_health_summary,
     load_orchestrator_status,
+    load_report_browser,
     load_setup_wizard,
     recent_audit_events,
     run_orchestrator_action,
@@ -27,6 +29,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Candle limit", html)
         self.assertIn("Build Dashboard", html)
         self.assertIn("Quick Setup", html)
+        self.assertIn("Report Browser", html)
         self.assertIn("No live order action is exposed", html)
         self.assertIn("Audit Timeline", html)
         self.assertNotIn("Buy", html)
@@ -58,6 +61,28 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("First Run", by_name)
         self.assertEqual("PASS", by_name["Config"].status)
         self.assertEqual("PASS", by_name["Live Guard"].status)
+
+    def test_report_browser_collects_research_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(data_root / "backtests" / "BTC_USDT" / "15m" / "metrics.json", {"recommendation": "PAPER_CANDIDATE", "trade_count": 30})
+            _write_json(data_root / "validation" / "walk_forward" / "BTC_USDT" / "15m.json", {"recommendation": "PASS", "total_test_trades": 30})
+            _write_json(data_root / "reports" / "daily" / "BTC_USDT" / "15m" / "2026-06-30.json", {"review_status": "NEUTRAL", "paper_trade_count": 0})
+            paper_path = data_root / "paper" / "BTC_USDT" / "trades.csv"
+            paper_path.parent.mkdir(parents=True, exist_ok=True)
+            paper_path.write_text("symbol,timeframe,net_pnl\nBTC/USDT,15m,1.2\n", encoding="utf-8")
+
+            reports = load_report_browser(config_path)
+            categories = {report.category for report in reports}
+
+        self.assertIn("Backtest", categories)
+        self.assertIn("Walk-Forward", categories)
+        self.assertIn("Paper", categories)
+        self.assertIn("Daily Journal", categories)
+        self.assertTrue(all(report.path for report in reports))
 
     def test_action_registry_has_only_safe_commands(self) -> None:
         self.assertIn("run_cycle", ACTIONS)
@@ -124,6 +149,11 @@ def _write_config(path: Path, data_root: Path) -> None:
         '[sessions]\nentry_windows_wib = ["08:00-11:00"]\nalways_collect_data = true\n',
         encoding="utf-8",
     )
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 if __name__ == "__main__":

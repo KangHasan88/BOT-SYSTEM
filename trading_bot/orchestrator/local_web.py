@@ -73,6 +73,17 @@ class SetupCheck:
     next_action: str
 
 
+@dataclass(frozen=True)
+class ReportItem:
+    category: str
+    name: str
+    status: str
+    summary: str
+    path: str
+    updated_at_utc: str
+    size_bytes: int
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -142,6 +153,17 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
     except (ConfigError, ValueError) as exc:
         checks.append(SetupCheck("Config", "FAIL", str(exc), "Fix config file"))
     return checks
+
+
+def load_report_browser(config_path: str | Path = "config/bot.sample.toml") -> list[ReportItem]:
+    config = load_config(Path(config_path))
+    root = Path(config.data_root)
+    reports: list[ReportItem] = []
+    reports.extend(_json_report_items(root / "backtests", "Backtest", "metrics.json"))
+    reports.extend(_json_report_items(root / "validation" / "walk_forward", "Walk-Forward", "*.json"))
+    reports.extend(_paper_report_items(root / "paper"))
+    reports.extend(_json_report_items(root / "reports" / "daily", "Daily Journal", "*.json"))
+    return sorted(reports, key=lambda item: item.updated_at_utc, reverse=True)
 
 
 def load_health_summary(config_path: str | Path = "config/bot.sample.toml") -> HealthSummary:
@@ -255,11 +277,13 @@ def build_orchestrator_page(
     audit_events: list[AuditEvent] | None = None,
     health: HealthSummary | None = None,
     setup_checks: list[SetupCheck] | None = None,
+    reports: list[ReportItem] | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
     health = health or HealthSummary("MISSING", "", "MISSING", "", "MISSING", "", "MISSING", "")
     setup_checks = setup_checks or []
+    reports = reports or []
     action_buttons = "".join(
         f'<button type="button" data-action="{escape(action)}" {"disabled" if status.action_running else ""}>{escape(_action_label(action))}</button>'
         for action in ACTIONS
@@ -268,6 +292,7 @@ def build_orchestrator_page(
     audit_html = _audit_html(audit_events)
     health_html = _health_html(health)
     setup_html = _setup_html(setup_checks)
+    reports_html = _reports_html(reports)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE ENABLED" if status.live_enabled else "Live Disabled"
     kill_text = "ACTIVE" if status.kill_switch_active else "Clear"
@@ -334,6 +359,11 @@ def build_orchestrator_page(
       <h2>Quick Setup</h2>
       <div>{setup_html}</div>
       <p class="small">Recommended first run: Validate Config, Security QA, Build Dashboard, then Run Cycle.</p>
+    </section>
+    <section class="panel">
+      <h2>Report Browser</h2>
+      <div>{reports_html}</div>
+      <p class="small">Reports are read-only summaries from local paper/research files.</p>
     </section>
     <section class="panel">
       <h2>Safe Actions</h2>
@@ -428,6 +458,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/setup":
                     self._json_response({"checks": [asdict(row) for row in load_setup_wizard(config_path)]})
                     return
+                if parsed.path == "/api/reports":
+                    self._json_response({"reports": [asdict(row) for row in load_report_browser(config_path)]})
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -452,7 +485,8 @@ def _handler_factory(config_path: Path):
                 audit_events = recent_audit_events(status.data_root)
                 health = load_health_summary(config_path)
                 setup = load_setup_wizard(config_path)
-                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup))
+                reports = load_report_browser(config_path)
+                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports))
             except (ConfigError, ValueError, OSError) as exc:
                 self._json_response({"error": str(exc)}, status=500)
 
@@ -615,6 +649,124 @@ def _setup_html(checks: list[SetupCheck]) -> str:
         + "".join(rows)
         + "</tbody></table>"
     )
+
+
+def _reports_html(reports: list[ReportItem]) -> str:
+    if not reports:
+        return '<p class="small">No reports found yet. Run Backtest, Walk-Forward, Paper, or Daily Journal actions first.</p>'
+    rows = []
+    for report in reports[:20]:
+        css = _report_status_class(report.status)
+        rows.append(
+            "<tr>"
+            f"<td>{escape(report.category)}</td>"
+            f"<td>{escape(report.name)}</td>"
+            f'<td><span class="badge {css}">{escape(report.status)}</span></td>'
+            f"<td>{escape(report.summary)}</td>"
+            f"<td><code>{escape(report.path)}</code></td>"
+            f"<td>{escape(report.updated_at_utc)}</td>"
+            "</tr>"
+        )
+    return (
+        "<table style=\"width:100%;border-collapse:collapse;\">"
+        "<thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Summary</th><th>Path</th><th>Updated</th></tr></thead>"
+        "<tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def _json_report_items(root: Path, category: str, pattern: str) -> list[ReportItem]:
+    if not root.exists():
+        return []
+    items: list[ReportItem] = []
+    for path in root.rglob(pattern):
+        payload = _read_json(path)
+        if payload is None:
+            items.append(_report_item(category, path, "INVALID", "invalid JSON"))
+            continue
+        status = _report_status(payload)
+        summary = _report_summary(payload)
+        items.append(_report_item(category, path, status, summary))
+    return items
+
+
+def _paper_report_items(root: Path) -> list[ReportItem]:
+    if not root.exists():
+        return []
+    items: list[ReportItem] = []
+    for path in root.rglob("*.csv"):
+        row_count = _csv_row_count(path)
+        status = "ACTIVE" if row_count else "EMPTY"
+        items.append(_report_item("Paper", path, status, f"rows={row_count}"))
+    return items
+
+
+def _report_item(category: str, path: Path, status: str, summary: str) -> ReportItem:
+    stat = path.stat()
+    return ReportItem(
+        category=category,
+        name=_report_name(path),
+        status=status,
+        summary=summary,
+        path=str(path),
+        updated_at_utc=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
+        size_bytes=stat.st_size,
+    )
+
+
+def _report_name(path: Path) -> str:
+    parts = list(path.parts)
+    if len(parts) >= 3:
+        return " / ".join(parts[-3:])
+    return path.name
+
+
+def _report_status(payload: dict) -> str:
+    for key in ("recommendation", "review_status", "status", "decision"):
+        value = payload.get(key)
+        if value:
+            return str(value)
+    return "AVAILABLE"
+
+
+def _report_summary(payload: dict) -> str:
+    keys = [
+        "reason",
+        "trade_count",
+        "total_test_trades",
+        "paper_trade_count",
+        "paper_net_pnl",
+        "total_return_pct",
+        "average_test_return_pct",
+        "max_drawdown_pct",
+        "review_status",
+    ]
+    parts = []
+    for key in keys:
+        if key in payload and payload[key] is not None:
+            parts.append(f"{key}={payload[key]}")
+        if len(parts) >= 4:
+            break
+    if not parts and isinstance(payload.get("notes"), list):
+        parts.append("notes=" + "; ".join(str(note) for note in payload["notes"][:2]))
+    return ", ".join(parts) if parts else "report available"
+
+
+def _report_status_class(status: str) -> str:
+    normalized = status.upper()
+    if normalized in {"REJECT", "NO_GO", "BLOCKED", "FAILED", "REVIEW_REQUIRED", "INVALID"}:
+        return "danger"
+    if normalized in {"NOT_ENOUGH_DATA", "NEEDS_FILTER", "NO_DATA", "EMPTY", "MISSING"}:
+        return "warn"
+    return "ok"
+
+
+def _csv_row_count(path: Path) -> int:
+    if not path.exists() or path.stat().st_size == 0:
+        return 0
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        return sum(1 for _ in csv.DictReader(handle))
 
 
 def _level_class(level: str) -> str:

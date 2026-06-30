@@ -85,6 +85,21 @@ The same status is available as JSON at:
 http://127.0.0.1:8000/api/setup
 ```
 
+## Report Browser
+
+The page includes a read-only report browser for:
+
+- backtest metrics;
+- walk-forward validation;
+- paper orders, trades, and account snapshots;
+- daily market journals.
+
+The same summary is available as JSON at:
+
+```text
+http://127.0.0.1:8000/api/reports
+```
+
 ## Activity
 
 Every UI action writes an activity record to:
