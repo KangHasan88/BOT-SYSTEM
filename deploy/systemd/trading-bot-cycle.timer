@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Trading Research Bot cycle every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Persistent=true
+Unit=trading-bot-cycle.service
+
+[Install]
+WantedBy=timers.target

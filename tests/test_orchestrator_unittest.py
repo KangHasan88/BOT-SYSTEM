@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from trading_bot.orchestrator import (
+    ACTIONS,
+    build_orchestrator_page,
+    load_health_summary,
+    load_orchestrator_status,
+    load_setup_wizard,
+    recent_audit_events,
+    run_orchestrator_action,
+)
+from trading_bot.observability import JsonlAuditLogger
+
+
+class OrchestratorTest(unittest.TestCase):
+    def test_page_has_safe_actions_and_no_live_order_button(self) -> None:
+        status = load_orchestrator_status("config/bot.sample.toml")
+        html = build_orchestrator_page(status)
+
+        self.assertIn("Trading Bot Orchestrator", html)
+        self.assertIn("Run Cycle", html)
+        self.assertIn("Sync Btc 15M", html)
+        self.assertIn("Candle limit", html)
+        self.assertIn("Build Dashboard", html)
+        self.assertIn("Quick Setup", html)
+        self.assertIn("No live order action is exposed", html)
+        self.assertIn("Audit Timeline", html)
+        self.assertNotIn("Buy", html)
+        self.assertNotIn("Sell", html)
+
+    def test_status_loader_reports_live_disabled(self) -> None:
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        self.assertFalse(status.live_enabled)
+        self.assertIn("work", status.data_root)
+
+    def test_health_summary_reports_key_domains(self) -> None:
+        health = load_health_summary("config/bot.sample.toml")
+
+        self.assertIn(health.data_status, {"OK", "BLOCKED", "MISSING"})
+        self.assertIn(health.paper_status, {"ACTIVE", "NO_TRADES"})
+        self.assertTrue(health.readiness_status)
+        self.assertIn(health.safety_status, {"SAFE", "BLOCKED"})
+
+    def test_setup_wizard_reports_first_run_steps(self) -> None:
+        checks = load_setup_wizard("config/bot.sample.toml")
+        by_name = {check.name: check for check in checks}
+
+        self.assertIn("Config", by_name)
+        self.assertIn("Live Guard", by_name)
+        self.assertIn("Data Root", by_name)
+        self.assertIn("Security QA", by_name)
+        self.assertIn("Dashboard", by_name)
+        self.assertIn("First Run", by_name)
+        self.assertEqual("PASS", by_name["Config"].status)
+        self.assertEqual("PASS", by_name["Live Guard"].status)
+
+    def test_action_registry_has_only_safe_commands(self) -> None:
+        self.assertIn("run_cycle", ACTIONS)
+        self.assertIn("sync_btc_15m", ACTIONS)
+        self.assertIn("sync_eth_15m", ACTIONS)
+        rendered = " ".join(" ".join(command) for command in ACTIONS.values()).lower()
+
+        self.assertNotIn("live-order", rendered)
+        self.assertNotIn("buy", rendered)
+        self.assertNotIn("sell", rendered)
+
+    def test_run_action_writes_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+
+            activity = run_orchestrator_action("validate_config", config_path=config_path, cwd=Path.cwd())
+            activity_path = root / "data" / "orchestrator" / "activity.jsonl"
+
+            self.assertEqual("SUCCESS", activity.status)
+            self.assertTrue(activity_path.exists())
+            self.assertIn("validate_config", activity_path.read_text(encoding="utf-8"))
+
+    def test_run_action_rejects_while_lock_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            lock = data_root / "orchestrator" / "action.lock"
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            lock.write_text('{"action":"run_cycle"}', encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                run_orchestrator_action("validate_config", config_path=config_path, cwd=Path.cwd())
+
+    def test_recent_audit_events_filters_level_symbol_and_timeframe(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = JsonlAuditLogger(tmpdir)
+            logger.write("cycle_start", "started", level="INFO")
+            logger.write("pair_error", "bad candle", level="ERROR", symbol="BTC/USDT", timeframe="15m")
+            logger.write("pair_error", "slow feed", level="ERROR", symbol="ETH/USDT", timeframe="15m")
+
+            rows = recent_audit_events(tmpdir, level="ERROR", symbol="BTC/USDT", timeframe="15m")
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual("pair_error", rows[0].event)
+        self.assertEqual("BTC/USDT", rows[0].context["symbol"])
+
+    def test_rejects_unsupported_action(self) -> None:
+        with self.assertRaises(ValueError):
+            run_orchestrator_action("place_live_order")
+
+
+def _write_config(path: Path, data_root: Path) -> None:
+    path.write_text(
+        '[bot]\nmode = "paper"\nlive_enabled = false\napproved_live = false\ntimezone = "Asia/Jakarta"\n'
+        '[market]\ntype = "crypto_spot"\nsymbols = ["BTC/USDT"]\ntimeframes = ["15m"]\n'
+        '[data]\nroot = "'
+        + str(data_root).replace("\\", "\\\\")
+        + '"\nprovider = "binance_public"\n'
+        '[risk]\nmax_open_positions = 1\n'
+        '[sessions]\nentry_windows_wib = ["08:00-11:00"]\nalways_collect_data = true\n',
+        encoding="utf-8",
+    )
+
+
+if __name__ == "__main__":
+    unittest.main()

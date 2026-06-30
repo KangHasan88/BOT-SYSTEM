@@ -1,0 +1,20 @@
+[Unit]
+Description=Trading Research Bot data and paper cycle
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=tradingbot
+Group=tradingbot
+WorkingDirectory=/opt/trading-bot
+EnvironmentFile=-/etc/trading-bot/trading-bot.env
+ExecStart=/opt/trading-bot/.venv/bin/python -m trading_bot.cli run-cycle --config /etc/trading-bot/bot.toml --sync-latest --limit 500 --initial-equity 1000 --min-notional 1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/trading-bot /var/log/trading-bot
+
+[Install]
+WantedBy=multi-user.target

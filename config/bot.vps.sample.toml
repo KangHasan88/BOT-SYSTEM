@@ -1,0 +1,39 @@
+[bot]
+mode = "paper"
+live_enabled = false
+approved_live = false
+timezone = "Asia/Jakarta"
+
+[market]
+type = "crypto_spot"
+symbols = ["BTC/USDT", "ETH/USDT"]
+timeframes = ["15m", "1h", "4h"]
+excluded_markets = ["futures", "margin", "leverage", "small_altcoins"]
+
+[data]
+root = "/var/lib/trading-bot/data"
+provider = "binance_public"
+
+[risk]
+risk_per_trade_pct = 0.25
+max_risk_per_trade_pct = 0.50
+daily_max_loss_pct = 1.00
+monthly_max_drawdown_pct = 5.00
+max_open_positions = 1
+max_consecutive_losses_per_day = 2
+
+[profit_lock]
+daily_trigger_pct = 0.50
+daily_lock_ratio = 0.60
+daily_target_pct = 1.00
+move_stop_to_break_even_at_r = 1.00
+
+[sessions]
+entry_windows_wib = ["08:00-11:00", "19:00-23:30"]
+always_collect_data = true
+
+[guards]
+reject_unknown_symbols = true
+reject_live_without_manual_approval = true
+reject_if_data_stale = true
+reject_if_spread_abnormal = true
