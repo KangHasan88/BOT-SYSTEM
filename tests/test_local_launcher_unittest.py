@@ -22,8 +22,8 @@ class LocalLauncherTest(unittest.TestCase):
         self.assertIn("serve-orchestrator", text)
         self.assertIn("/api/setup", text)
         self.assertIn("local-web.pid", text)
-        self.assertIn("local-web.out.log", text)
-        self.assertIn("local-web.err.log", text)
+        self.assertIn("Start-Process", text)
+        self.assertIn("WindowStyle Hidden", text)
 
     def test_launcher_does_not_expose_live_trading_commands(self) -> None:
         combined = "\n".join(

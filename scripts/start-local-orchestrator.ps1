@@ -12,8 +12,6 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..")
 $WorkDir = Join-Path $ProjectRoot "work\orchestrator"
 $PidFile = Join-Path $WorkDir "local-web.pid"
-$OutLog = Join-Path $WorkDir "local-web.out.log"
-$ErrLog = Join-Path $WorkDir "local-web.err.log"
 $Url = "http://${HostName}:${Port}/"
 
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
@@ -105,8 +103,6 @@ $Process = Start-Process `
     -FilePath $Python `
     -ArgumentList $Args `
     -WorkingDirectory $ProjectRoot `
-    -RedirectStandardOutput $OutLog `
-    -RedirectStandardError $ErrLog `
     -WindowStyle Hidden `
     -PassThru
 
@@ -127,17 +123,13 @@ for ($Attempt = 0; $Attempt -lt 20; $Attempt++) {
 if (-not $Ready) {
     Write-Host "Trading Bot Orchestrator did not become ready."
     Write-Host "PID: $($Process.Id)"
-    Write-Host "Error log: $ErrLog"
-    if (Test-Path $ErrLog) {
-        Get-Content $ErrLog -Tail 20
-    }
+    Write-Host "Run the command manually in PowerShell to inspect startup errors."
     exit 1
 }
 
 Write-Host "Trading Bot Orchestrator started."
 Write-Host "URL: $Url"
 Write-Host "PID: $($Process.Id)"
-Write-Host "Logs: $OutLog"
 
 if (-not $NoBrowser) {
     Start-Process $Url
