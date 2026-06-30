@@ -50,6 +50,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 ## Aksi Aman
 
 - Validasi Config;
+- Import DB SQLite lokal;
 - Buat Dashboard statis;
 - Security QA;
 - Production Smoke;
@@ -84,6 +85,7 @@ Halaman utama punya checklist first-run untuk:
 - ketersediaan root data market;
 - report Security QA;
 - dashboard yang sudah dibuat;
+- database SQLite lokal;
 - aksi UI pertama yang tercatat.
 
 Status yang sama tersedia sebagai JSON di:

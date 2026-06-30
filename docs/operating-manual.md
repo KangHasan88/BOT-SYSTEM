@@ -17,6 +17,7 @@ python -m trading_bot.cli risk-guard-drill --config config/bot.sample.toml --sym
 
 UX direction: `docs/ux-architecture-decision.md`
 Local web orchestrator: `docs/local-web-orchestrator.md`
+Database storage lokal: `docs/database-storage.md`
 
 Start local web orchestrator:
 
@@ -33,6 +34,13 @@ Build ulang dashboard:
 
 ```bash
 python -m trading_bot.cli build-dashboard
+```
+
+Init/import database lokal:
+
+```bash
+python -m trading_bot.cli init-db --config config/bot.sample.toml
+python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 ```
 
 ## Data Collection

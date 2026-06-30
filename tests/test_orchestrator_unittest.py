@@ -32,6 +32,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("data-table", html)
         self.assertIn("Jalankan Siklus", html)
         self.assertIn("Sinkron BTC 15m", html)
+        self.assertIn("Import DB", html)
         self.assertIn("Limit candle", html)
         self.assertIn("Buat Dashboard", html)
         self.assertIn("Setup Cepat", html)
@@ -65,6 +66,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Data Root", by_name)
         self.assertIn("Security QA", by_name)
         self.assertIn("Dashboard", by_name)
+        self.assertIn("Database", by_name)
         self.assertIn("First Run", by_name)
         self.assertEqual("PASS", by_name["Config"].status)
         self.assertEqual("PASS", by_name["Live Guard"].status)
@@ -108,6 +110,7 @@ class OrchestratorTest(unittest.TestCase):
 
     def test_action_registry_has_only_safe_commands(self) -> None:
         self.assertIn("run_cycle", ACTIONS)
+        self.assertIn("import_runtime_db", ACTIONS)
         self.assertIn("sync_btc_15m", ACTIONS)
         self.assertIn("sync_eth_15m", ACTIONS)
         self.assertIn("incident_drill", ACTIONS)

@@ -18,6 +18,7 @@ from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kil
 
 ACTIONS: dict[str, tuple[str, ...]] = {
     "validate_config": ("validate-config", "--config", "{config}"),
+    "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -152,6 +153,14 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
                 "PASS" if (root / "dashboard" / "index.html").exists() else "TODO",
                 str(root / "dashboard" / "index.html"),
                 "Klik Buat Dashboard",
+            )
+        )
+        checks.append(
+            SetupCheck(
+                "Database",
+                "PASS" if (root / "bot.sqlite3").exists() else "TODO",
+                str(root / "bot.sqlite3"),
+                "Klik Import DB",
             )
         )
         checks.append(
@@ -720,6 +729,8 @@ def _action_icon(action: str) -> str:
         return _svg_icon("shield")
     if "dashboard" in action:
         return _svg_icon("chart")
+    if "db" in action:
+        return _svg_icon("database")
     if "smoke" in action or "validate" in action:
         return _svg_icon("check")
     return _svg_icon("play")
@@ -730,6 +741,7 @@ def _svg_icon(name: str) -> str:
         "board": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>',
         "chart": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm6 0V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v10m6 0a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14z"/></svg>',
         "check": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+        "database": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5v6c0 1.657 3.134 3 7 3s7-1.343 7-3V5M5 11v6c0 1.657 3.134 3 7 3s7-1.343 7-3v-6"/></svg>',
         "play": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-5.197-3.03A1 1 0 008 9.003v5.994a1 1 0 001.555.832l5.197-2.964a1 1 0 000-1.697z"/></svg>',
         "refresh": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>',
         "shield": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l7 4v5c0 4.418-2.985 8.13-7 9-4.015-.87-7-4.582-7-9V7l7-4z"/></svg>',
@@ -973,6 +985,7 @@ def _context_summary(context: dict) -> str:
 def _action_label(action: str) -> str:
     labels = {
         "validate_config": "Validasi Config",
+        "import_runtime_db": "Import DB",
         "build_dashboard": "Buat Dashboard",
         "security_qa": "Security QA",
         "production_smoke": "Production Smoke",

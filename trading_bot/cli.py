@@ -51,6 +51,7 @@ from trading_bot.readiness import evaluate_live_readiness, save_live_readiness_r
 from trading_bot.scheduler import is_entry_allowed_at_ms
 from trading_bot.security import load_env_file, scan_for_secrets, validate_env_security
 from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kill_switch
+from trading_bot.storage import default_database_path, import_runtime_data, init_database
 from trading_bot.risk_manager import (
     AccountState,
     TradeCandidate,
@@ -72,6 +73,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="config/bot.sample.toml",
         help="Path to the bot config file.",
     )
+
+    init_db = subparsers.add_parser("init-db")
+    init_db.add_argument("--config", default="config/bot.sample.toml")
+    init_db.add_argument("--db-path")
+    init_db.add_argument("--schema", default="database/schema.sql")
+
+    import_db = subparsers.add_parser("import-runtime-db")
+    import_db.add_argument("--config", default="config/bot.sample.toml")
+    import_db.add_argument("--db-path")
+    import_db.add_argument("--schema", default="database/schema.sql")
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -333,6 +344,36 @@ def main(argv: list[str] | None = None) -> int:
             "config ok: "
             f"mode={config.mode}, live_enabled={str(config.live_enabled).lower()}, "
             f"symbols={','.join(config.symbols)}"
+        )
+        return 0
+
+    if args.command == "init-db":
+        try:
+            config = load_config(Path(args.config))
+            db_path = Path(args.db_path) if args.db_path else default_database_path(config.data_root)
+            path = init_database(db_path, args.schema)
+        except (ConfigError, OSError) as exc:
+            print(f"init db failed: {exc}")
+            return 2
+
+        print(f"init db ok: path={path}")
+        return 0
+
+    if args.command == "import-runtime-db":
+        try:
+            config = load_config(Path(args.config))
+            db_path = Path(args.db_path) if args.db_path else default_database_path(config.data_root)
+            summary = import_runtime_data(config.data_root, db_path, args.schema)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"import runtime db failed: {exc}")
+            return 2
+
+        print(
+            "import runtime db ok: "
+            f"path={summary.db_path}, total={summary.total_rows}, candles={summary.candles}, "
+            f"paper_orders={summary.paper_orders}, paper_trades={summary.paper_trades}, "
+            f"paper_account={summary.paper_account_snapshots}, audit={summary.audit_events}, "
+            f"orchestrator={summary.orchestrator_activities}"
         )
         return 0
 

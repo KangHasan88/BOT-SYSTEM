@@ -39,6 +39,8 @@ python -m trading_bot.cli run-paper --symbol BTC/USDT --timeframe 15m --initial-
 python -m trading_bot.cli daily-journal --symbol BTC/USDT --timeframe 15m --initial-equity 1000
 python -m trading_bot.cli build-dashboard
 python -m trading_bot.cli serve-orchestrator --config config/bot.sample.toml --host 127.0.0.1 --port 8000
+python -m trading_bot.cli init-db --config config/bot.sample.toml
+python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli alert-daily-report --symbol BTC/USDT --timeframe 15m
 python -m trading_bot.cli alert-stop --symbol BTC/USDT --reason "daily target reached" --equity 1010
 python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
@@ -68,6 +70,8 @@ Paper mode writes virtual orders, trades, and account snapshots under
 Daily journal writes market research summaries under `work/market_data/reports/daily`.
 The dashboard MVP writes a local HTML review page under `work/market_data/dashboard`.
 The local web orchestrator runs at `http://127.0.0.1:8000` when started.
+SQLite archive storage writes to `work/market_data/bot.sqlite3` for local
+research history.
 Alerting writes local JSON messages under `work/market_data/alerts/outbox` until
 Telegram/email credentials are configured in a later secure adapter.
 Execution v1 only exposes sandbox/testnet adapters; live order routing is not enabled.
@@ -103,3 +107,4 @@ Production smoke and rollback policy is documented in `docs/production-smoke-rol
 Live go/no-go policy is documented in `docs/live-go-no-go.md`.
 UX architecture decision is documented in `docs/ux-architecture-decision.md`.
 Local web orchestrator usage is documented in `docs/local-web-orchestrator.md`.
+SQLite archive storage is documented in `docs/database-storage.md`.

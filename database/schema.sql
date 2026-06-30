@@ -197,3 +197,18 @@ CREATE INDEX IF NOT EXISTS idx_paper_trades_symbol_tf_exit
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_level_ts
     ON audit_events (level, ts);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_paper_orders_unique_import
+    ON paper_orders (symbol, timeframe, open_time_ms, side, action, status, reason);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_paper_trades_unique_import
+    ON paper_trades (symbol, timeframe, entry_time_ms, exit_time_ms, exit_reason);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_paper_account_unique_import
+    ON paper_account_snapshots (open_time_ms);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_events_unique_import
+    ON audit_events (ts, level, event, message);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orchestrator_activity_unique_import
+    ON orchestrator_activity (ts, action, status, return_code);
