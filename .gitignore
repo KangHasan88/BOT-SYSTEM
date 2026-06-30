@@ -20,3 +20,4 @@ outputs/
 *.sqlite
 *.db
 
+.github_bot_system_ed25519*
