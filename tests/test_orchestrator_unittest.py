@@ -26,6 +26,10 @@ class OrchestratorTest(unittest.TestCase):
         html = build_orchestrator_page(status)
 
         self.assertIn("Trading Bot Orchestrator", html)
+        self.assertIn("fonts.bunny.net/css?family=inter", html)
+        self.assertIn("board-header", html)
+        self.assertIn("toolbar-group", html)
+        self.assertIn("data-table", html)
         self.assertIn("Run Cycle", html)
         self.assertIn("Sync Btc 15M", html)
         self.assertIn("Candle limit", html)

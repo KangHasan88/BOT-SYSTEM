@@ -335,10 +335,7 @@ def build_orchestrator_page(
     setup_checks = setup_checks or []
     reports = reports or []
     incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "no incident drill report yet")
-    action_buttons = "".join(
-        f'<button type="button" data-action="{escape(action)}" {"disabled" if status.action_running else ""}>{escape(_action_label(action))}</button>'
-        for action in ACTIONS
-    )
+    action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
     health_html = _health_html(health)
@@ -354,46 +351,93 @@ def build_orchestrator_page(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trading Bot Orchestrator</title>
+  <link rel="preconnect" href="https://fonts.bunny.net">
+  <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800" rel="stylesheet">
   <style>
     :root {{
-      --page: #f5f7fb;
+      --primary-dark: #071a3d;
+      --primary-light: #123b7a;
+      --primary-soft: #eaf2ff;
+      --page: #f6f8fb;
       --panel: #ffffff;
-      --ink: #17202a;
+      --ink: #1e293b;
       --muted: #64748b;
-      --line: #d9e2ec;
-      --good: #0f766e;
-      --bad: #b91c1c;
-      --warn: #b45309;
-      --focus: #2563eb;
+      --line: #d8e2ee;
+      --soft-line: #e3ebf5;
+      --toolbar: #f1f5f9;
+      --good: #15803d;
+      --bad: #dc2626;
+      --warn: #d97706;
+      --focus: #123b7a;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     }}
     * {{ box-sizing: border-box; }}
-    body {{ margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--page); color: var(--ink); }}
-    header {{ background: var(--panel); border-bottom: 1px solid var(--line); padding: 18px 22px; }}
-    h1 {{ margin: 0; font-size: 22px; letter-spacing: 0; }}
-    main {{ max-width: 1180px; margin: 0 auto; padding: 20px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 18px; }}
-    .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }}
-    .panel h2 {{ margin: 0 0 10px; font-size: 15px; }}
-    .metric span {{ display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }}
-    .metric strong {{ display: block; font-size: 18px; overflow-wrap: anywhere; }}
-    .badge {{ display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-    .ok {{ background: #e6f4f1; color: var(--good); }}
-    .danger {{ background: #fde8e8; color: var(--bad); }}
-    .warn {{ background: #fff4e5; color: var(--warn); }}
-    .actions {{ display: flex; flex-wrap: wrap; gap: 8px; }}
-    button {{ border: 1px solid #b9c6d3; border-radius: 6px; background: #ffffff; padding: 9px 11px; cursor: pointer; font-weight: 700; }}
-    button:hover {{ border-color: var(--focus); color: var(--focus); }}
-    pre {{ margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }}
-    .activity {{ border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }}
+    body {{ margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--page); color: var(--ink); }}
+    h1 {{ margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: 0; font-weight: 800; }}
+    .shell {{ max-width: 1280px; margin: 0 auto; padding: 24px 16px 28px; }}
+    .board-header {{ background: var(--panel); border: 1px solid var(--soft-line); border-radius: 12px; box-shadow: var(--shadow); padding: 20px; margin-bottom: 18px; }}
+    .board-title {{ display: flex; align-items: center; gap: 10px; padding-bottom: 15px; border-bottom: 1px solid var(--soft-line); }}
+    .title-icon {{ width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #1e3a5f, #2d4a7c); display: inline-flex; align-items: center; justify-content: center; color: #fff; box-shadow: var(--shadow); }}
+    .header-meta {{ display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }}
+    .board-toolbar {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }}
+    .toolbar-group {{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: var(--toolbar); border-radius: 12px; padding: 4px; box-shadow: var(--shadow); }}
+    .toolbar-divider {{ width: 1px; height: 24px; background: #cbd5e1; margin: 0 4px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }}
+    .panel {{ background: var(--panel); border: 1px solid var(--soft-line); border-radius: 12px; box-shadow: var(--shadow); padding: 15px; margin-bottom: 14px; }}
+    .panel h2 {{ margin: 0 0 12px; font-size: 15px; font-weight: 800; color: #334155; }}
+    .metric {{ min-height: 86px; }}
+    .metric span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 8px; }}
+    .metric strong {{ display: block; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }}
+    .badge {{ display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.35; }}
+    .ok {{ background: #dcfce7; color: var(--good); }}
+    .danger {{ background: #fee2e2; color: var(--bad); }}
+    .warn {{ background: #fef3c7; color: var(--warn); }}
+    .actions {{ display: contents; }}
+    .btn {{ display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: transparent; color: #334155; padding: 7px 10px; cursor: pointer; font-size: 13px; font-weight: 700; line-height: 1.2; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }}
+    .btn:hover {{ background: #fff; color: var(--focus); box-shadow: var(--shadow); }}
+    .btn:disabled {{ opacity: .55; cursor: not-allowed; }}
+    .btn-danger {{ color: #991b1b; }}
+    .btn-danger:hover {{ color: #b91c1c; background: #fff; }}
+    .btn svg, .title-icon svg {{ width: 16px; height: 16px; flex: none; }}
+    pre {{ margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; color: #334155; background: #f8fafc; border: 1px solid var(--soft-line); border-radius: 8px; padding: 10px; }}
+    .activity {{ border-top: 1px solid var(--soft-line); padding-top: 10px; margin-top: 10px; }}
     .activity:first-child {{ border-top: 0; margin-top: 0; padding-top: 0; }}
-    .filters {{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }}
-    select, input {{ border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: #fff; }}
-    .small {{ color: var(--muted); font-size: 12px; }}
+    .filters {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }}
+    select, input {{ border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; }}
+    select:focus, input:focus {{ outline: 2px solid var(--primary-soft); border-color: var(--focus); }}
+    .small {{ color: var(--muted); font-size: 12px; line-height: 1.45; }}
+    .data-table {{ width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; overflow: hidden; border: 1px solid var(--soft-line); border-radius: 10px; }}
+    .data-table th {{ background: #f8fafc; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; text-align: left; padding: 10px; border-bottom: 1px solid var(--soft-line); }}
+    .data-table td {{ padding: 10px; border-bottom: 1px solid #edf2f7; vertical-align: top; color: #334155; }}
+    .data-table tr:last-child td {{ border-bottom: 0; }}
+    code {{ color: #334155; background: #f1f5f9; border-radius: 6px; padding: 2px 5px; font-size: 12px; }}
+    @media (max-width: 720px) {{
+      .shell {{ padding: 12px; }}
+      .board-title {{ align-items: flex-start; }}
+      .toolbar-group {{ width: 100%; }}
+      .data-table {{ display: block; overflow-x: auto; }}
+    }}
   </style>
 </head>
 <body>
-  <header><h1>Trading Bot Orchestrator</h1></header>
-  <main>
+  <main class="shell">
+    <section class="board-header">
+      <div class="board-title">
+        <div class="title-icon">{_svg_icon("board")}</div>
+        <div>
+          <h1>Trading Bot Orchestrator</h1>
+          <div class="header-meta">
+            <span>Mode: {escape(status.mode)}</span>
+            <span>Data: {escape(status.data_root)}</span>
+            <span>Live: {"enabled" if status.live_enabled else "disabled"}</span>
+            <span>Action: {escape(status.running_action if status.action_running else "idle")}</span>
+          </div>
+        </div>
+      </div>
+      <div class="board-toolbar">
+        <div class="toolbar-group">{action_buttons}</div>
+      </div>
+    </section>
     <section class="grid">
       {_metric("Mode", status.mode)}
       {_metric("Safety", f'<span class="badge {safety_class}">{escape(live_text)}</span>')}
@@ -422,16 +466,15 @@ def build_orchestrator_page(
       <div>{incident_html}</div>
       <div class="filters">
         <input id="kill-reason" placeholder="Reason required to activate">
-        <button type="button" id="kill-activate">Activate Kill Switch</button>
-        <button type="button" id="kill-clear">Clear Kill Switch</button>
+        <button type="button" class="btn btn-danger" id="kill-activate">{_svg_icon("stop")}Activate Kill Switch</button>
+        <button type="button" class="btn" id="kill-clear">{_svg_icon("refresh")}Clear Kill Switch</button>
       </div>
       <p class="small">Kill switch blocks bot cycles. Incident drill is available as a safe action above.</p>
     </section>
     <section class="panel">
       <h2>Safe Actions</h2>
       <label class="small" for="limit">Candle limit</label>
-      <input id="limit" type="number" min="1" max="1000" value="10" style="width:100px; padding:8px; margin:0 0 10px 8px; border:1px solid var(--line); border-radius:6px;">
-      <div class="actions">{action_buttons}</div>
+      <input id="limit" type="number" min="1" max="1000" value="10" style="width:100px; margin:0 0 10px 8px;">
       <p class="small">All actions run CLI commands in paper/research mode. No live order action is exposed here.</p>
     </section>
     <section class="panel">
@@ -455,7 +498,7 @@ def build_orchestrator_page(
         </select>
         <input id="audit-symbol" placeholder="Symbol">
         <input id="audit-timeframe" placeholder="Timeframe">
-        <button type="button" id="audit-refresh">Refresh</button>
+        <button type="button" class="btn" id="audit-refresh">{_svg_icon("refresh")}Refresh</button>
       </div>
       <div id="audit">{audit_html}</div>
     </section>
@@ -661,6 +704,39 @@ def _json_value(path: Path, key: str, default: str) -> str:
         return "INVALID"
 
 
+def _action_button(action: str, disabled: bool) -> str:
+    icon = _action_icon(action)
+    return (
+        f'<button type="button" class="btn" data-action="{escape(action)}" {"disabled" if disabled else ""} '
+        f'title="{escape(_action_label(action))}">{icon}{escape(_action_label(action))}</button>'
+    )
+
+
+def _action_icon(action: str) -> str:
+    if "sync" in action:
+        return _svg_icon("refresh")
+    if "security" in action or "go_no_go" in action or "incident" in action:
+        return _svg_icon("shield")
+    if "dashboard" in action:
+        return _svg_icon("chart")
+    if "smoke" in action or "validate" in action:
+        return _svg_icon("check")
+    return _svg_icon("play")
+
+
+def _svg_icon(name: str) -> str:
+    icons = {
+        "board": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>',
+        "chart": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm6 0V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v10m6 0a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14z"/></svg>',
+        "check": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+        "play": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-5.197-3.03A1 1 0 008 9.003v5.994a1 1 0 001.555.832l5.197-2.964a1 1 0 000-1.697z"/></svg>',
+        "refresh": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>',
+        "shield": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l7 4v5c0 4.418-2.985 8.13-7 9-4.015-.87-7-4.582-7-9V7l7-4z"/></svg>',
+        "stop": '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M12 22a10 10 0 110-20 10 10 0 010 20z"/></svg>',
+    }
+    return icons.get(name, icons["play"])
+
+
 def _metric(label: str, value: object) -> str:
     return (
         '<div class="panel metric">'
@@ -736,7 +812,7 @@ def _setup_html(checks: list[SetupCheck]) -> str:
             "</tr>"
         )
     return (
-        "<table style=\"width:100%;border-collapse:collapse;\">"
+        '<table class="data-table">'
         "<thead><tr><th>Check</th><th>Status</th><th>Reason</th><th>Next</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
@@ -761,7 +837,7 @@ def _reports_html(reports: list[ReportItem]) -> str:
             "</tr>"
         )
     return (
-        "<table style=\"width:100%;border-collapse:collapse;\">"
+        '<table class="data-table">'
         "<thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Summary</th><th>Path</th><th>Updated</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
