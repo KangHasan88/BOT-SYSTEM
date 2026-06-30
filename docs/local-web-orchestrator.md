@@ -109,6 +109,18 @@ Ringkasan yang sama tersedia sebagai JSON di:
 http://127.0.0.1:8000/api/reports
 ```
 
+## Database Lokal
+
+Panel `Database Lokal` menampilkan path SQLite, ukuran file, waktu update,
+total row, dan jumlah row per tabel utama. Jalankan `Import DB` setelah sync
+atau paper cycle agar data harian masuk ke arsip lokal.
+
+Ringkasan yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/database
+```
+
 ## Kill Switch Dan Incident Panel
 
 Halaman utama punya panel safety untuk:

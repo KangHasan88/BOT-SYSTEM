@@ -2,6 +2,7 @@
 
 from trading_bot.orchestrator.local_web import (
     ACTIONS,
+    DatabasePanel,
     HealthSummary,
     IncidentPanel,
     OrchestratorActivity,
@@ -9,6 +10,7 @@ from trading_bot.orchestrator.local_web import (
     ReportItem,
     SetupCheck,
     build_orchestrator_page,
+    load_database_panel,
     load_health_summary,
     load_incident_panel,
     load_orchestrator_status,
@@ -22,6 +24,7 @@ from trading_bot.orchestrator.local_web import (
 
 __all__ = [
     "ACTIONS",
+    "DatabasePanel",
     "HealthSummary",
     "IncidentPanel",
     "OrchestratorActivity",
@@ -29,6 +32,7 @@ __all__ = [
     "ReportItem",
     "SetupCheck",
     "build_orchestrator_page",
+    "load_database_panel",
     "load_health_summary",
     "load_incident_panel",
     "load_orchestrator_status",

@@ -19,6 +19,12 @@ Import data runtime:
 & 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 ```
 
+Cek ringkasan database:
+
+```powershell
+& 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli db-status --config config/bot.sample.toml
+```
+
 Default file database:
 
 ```text
@@ -34,6 +40,13 @@ work/market_data/bot.sqlite3
 
 Import bersifat idempotent. Jika command dijalankan berkali-kali, row yang sama
 tidak akan dobel.
+
+Ringkasan SQLite juga muncul di web orchestrator sebagai panel `Database Lokal`
+dan tersedia via JSON di:
+
+```text
+http://127.0.0.1:8000/api/database
+```
 
 ## Batasan V1
 

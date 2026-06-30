@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 from trading_bot.config import ConfigError, load_config
 from trading_bot.observability import AuditEvent, read_audit_events
 from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kill_switch
+from trading_bot.storage import DatabaseStatus, load_database_status
 
 
 ACTIONS: dict[str, tuple[str, ...]] = {
@@ -95,6 +96,16 @@ class IncidentPanel:
     incident_generated_at_utc: str
     scenario_count: int
     scenario_summary: str
+
+
+@dataclass(frozen=True)
+class DatabasePanel:
+    db_path: str
+    exists: bool
+    size_bytes: int
+    updated_at_utc: str
+    total_rows: int
+    table_rows: dict[str, int]
 
 
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
@@ -207,6 +218,11 @@ def load_incident_panel(config_path: str | Path = "config/bot.sample.toml") -> I
         scenario_count=len(scenario_names),
         scenario_summary=", ".join(scenario_names) if scenario_names else "belum ada laporan incident drill",
     )
+
+
+def load_database_panel(config_path: str | Path = "config/bot.sample.toml") -> DatabasePanel:
+    config = load_config(Path(config_path))
+    return _database_panel_from_status(load_database_status(config.data_root))
 
 
 def update_kill_switch_from_web(
@@ -337,6 +353,7 @@ def build_orchestrator_page(
     setup_checks: list[SetupCheck] | None = None,
     reports: list[ReportItem] | None = None,
     incident: IncidentPanel | None = None,
+    database: DatabasePanel | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
@@ -344,6 +361,7 @@ def build_orchestrator_page(
     setup_checks = setup_checks or []
     reports = reports or []
     incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "belum ada laporan incident drill")
+    database = database or DatabasePanel("", False, 0, "", 0, {})
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -351,6 +369,7 @@ def build_orchestrator_page(
     setup_html = _setup_html(setup_checks)
     reports_html = _reports_html(reports)
     incident_html = _incident_html(incident)
+    database_html = _database_html(database)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -470,6 +489,11 @@ def build_orchestrator_page(
       <h2>Browser Laporan</h2>
       <div>{reports_html}</div>
       <p class="small">Laporan ini read-only dari file lokal paper/research.</p>
+    </section>
+    <section class="panel">
+      <h2>Database Lokal</h2>
+      <div>{database_html}</div>
+      <p class="small">SQLite ini arsip lokal untuk data harian, audit, dan aktivitas bot. Klik Import DB setelah sinkron/paper cycle.</p>
     </section>
     <section class="panel">
       <h2>Kill Switch & Incident</h2>
@@ -595,6 +619,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/incident":
                     self._json_response(asdict(load_incident_panel(config_path)))
                     return
+                if parsed.path == "/api/database":
+                    self._json_response(asdict(load_database_panel(config_path)))
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -621,7 +648,8 @@ def _handler_factory(config_path: Path):
                 setup = load_setup_wizard(config_path)
                 reports = load_report_browser(config_path)
                 incident = load_incident_panel(config_path)
-                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident))
+                database = load_database_panel(config_path)
+                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident, database))
             except (ConfigError, ValueError, OSError) as exc:
                 self._json_response({"error": str(exc)}, status=500)
 
@@ -868,6 +896,49 @@ def _incident_html(panel: IncidentPanel) -> str:
         + _metric("Incident Drill", f'<span class="badge {incident_css}">{escape(panel.incident_status)}</span>')
         + _metric("Skenario", f"{panel.scenario_count}: {panel.scenario_summary}")
         + "</div>"
+    )
+
+
+def _database_html(panel: DatabasePanel) -> str:
+    if not panel.exists:
+        return (
+            '<p class="small">Database belum ada. Klik Import DB untuk membuat '
+            f'<code>{escape(panel.db_path or "work/market_data/bot.sqlite3")}</code>.</p>'
+        )
+    rows = []
+    for table, count in panel.table_rows.items():
+        rows.append(
+            "<tr>"
+            f"<td>{escape(table)}</td>"
+            f"<td>{count}</td>"
+            "</tr>"
+        )
+    table_html = (
+        '<table class="data-table">'
+        "<thead><tr><th>Tabel</th><th>Rows</th></tr></thead>"
+        "<tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+    return (
+        '<div class="grid">'
+        + _metric("Total Rows", panel.total_rows)
+        + _metric("Ukuran DB", f"{panel.size_bytes} bytes")
+        + _metric("Update", panel.updated_at_utc or "-")
+        + "</div>"
+        + f"<p class=\"small\">Path: <code>{escape(panel.db_path)}</code></p>"
+        + table_html
+    )
+
+
+def _database_panel_from_status(status: DatabaseStatus) -> DatabasePanel:
+    return DatabasePanel(
+        db_path=status.db_path,
+        exists=status.exists,
+        size_bytes=status.size_bytes,
+        updated_at_utc=status.updated_at_utc,
+        total_rows=status.total_rows,
+        table_rows={table.table: table.rows for table in status.tables},
     )
 
 

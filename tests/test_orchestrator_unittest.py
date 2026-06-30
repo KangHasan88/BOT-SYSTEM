@@ -7,7 +7,9 @@ from pathlib import Path
 
 from trading_bot.orchestrator import (
     ACTIONS,
+    DatabasePanel,
     build_orchestrator_page,
+    load_database_panel,
     load_health_summary,
     load_incident_panel,
     load_orchestrator_status,
@@ -37,6 +39,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Buat Dashboard", html)
         self.assertIn("Setup Cepat", html)
         self.assertIn("Browser Laporan", html)
+        self.assertIn("Database Lokal", html)
         self.assertIn("Kill Switch & Incident", html)
         self.assertIn("Tidak ada tombol live buy/sell/order", html)
         self.assertIn("Timeline Audit", html)
@@ -92,6 +95,36 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Paper", categories)
         self.assertIn("Daily Journal", categories)
         self.assertTrue(all(report.path for report in reports))
+
+    def test_database_panel_renders_local_sqlite_summary(self) -> None:
+        panel = DatabasePanel(
+            db_path="work/market_data/bot.sqlite3",
+            exists=True,
+            size_bytes=4096,
+            updated_at_utc="2026-06-30T00:00:00+00:00",
+            total_rows=3,
+            table_rows={"audit_events": 2, "orchestrator_activity": 1},
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, database=panel)
+
+        self.assertIn("Database Lokal", html)
+        self.assertIn("Total Rows", html)
+        self.assertIn("audit_events", html)
+        self.assertIn("orchestrator_activity", html)
+
+    def test_database_panel_loader_reports_missing_db(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+
+            panel = load_database_panel(config_path)
+
+        self.assertFalse(panel.exists)
+        self.assertEqual(0, panel.total_rows)
+        self.assertIn("bot.sqlite3", panel.db_path)
 
     def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

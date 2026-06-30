@@ -29,6 +29,25 @@ class DatabaseImportSummary:
         )
 
 
+@dataclass(frozen=True)
+class DatabaseTableSummary:
+    table: str
+    rows: int
+
+
+@dataclass(frozen=True)
+class DatabaseStatus:
+    db_path: str
+    exists: bool
+    size_bytes: int
+    updated_at_utc: str
+    tables: list[DatabaseTableSummary]
+
+    @property
+    def total_rows(self) -> int:
+        return sum(table.rows for table in self.tables)
+
+
 def default_database_path(data_root: str | Path) -> Path:
     return Path(data_root) / "bot.sqlite3"
 
@@ -66,6 +85,35 @@ def import_runtime_data(
     return summary
 
 
+def load_database_status(data_root: str | Path, db_path: str | Path | None = None) -> DatabaseStatus:
+    database = Path(db_path) if db_path is not None else default_database_path(data_root)
+    if not database.exists():
+        return DatabaseStatus(str(database), False, 0, "", [])
+
+    stat = database.stat()
+    tables = [
+        "market_candles",
+        "paper_orders",
+        "paper_trades",
+        "paper_account_snapshots",
+        "audit_events",
+        "orchestrator_activity",
+    ]
+    with sqlite3.connect(database) as connection:
+        summaries = [
+            DatabaseTableSummary(table=table, rows=_table_count(connection, table))
+            for table in tables
+            if _table_exists(connection, table)
+        ]
+    return DatabaseStatus(
+        db_path=str(database),
+        exists=True,
+        size_bytes=stat.st_size,
+        updated_at_utc=_utc_from_timestamp(stat.st_mtime),
+        tables=summaries,
+    )
+
+
 def _create_idempotency_indexes(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
@@ -81,6 +129,24 @@ def _create_idempotency_indexes(connection: sqlite3.Connection) -> None:
             ON orchestrator_activity (ts, action, status, return_code);
         """
     )
+
+
+def _table_exists(connection: sqlite3.Connection, table: str) -> bool:
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def _table_count(connection: sqlite3.Connection, table: str) -> int:
+    return int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+
+
+def _utc_from_timestamp(timestamp: float) -> str:
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="seconds")
 
 
 def _import_candles(connection: sqlite3.Connection, root: Path) -> int:

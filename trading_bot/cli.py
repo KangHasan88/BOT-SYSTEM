@@ -51,7 +51,7 @@ from trading_bot.readiness import evaluate_live_readiness, save_live_readiness_r
 from trading_bot.scheduler import is_entry_allowed_at_ms
 from trading_bot.security import load_env_file, scan_for_secrets, validate_env_security
 from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kill_switch
-from trading_bot.storage import default_database_path, import_runtime_data, init_database
+from trading_bot.storage import default_database_path, import_runtime_data, init_database, load_database_status
 from trading_bot.risk_manager import (
     AccountState,
     TradeCandidate,
@@ -83,6 +83,10 @@ def build_parser() -> argparse.ArgumentParser:
     import_db.add_argument("--config", default="config/bot.sample.toml")
     import_db.add_argument("--db-path")
     import_db.add_argument("--schema", default="database/schema.sql")
+
+    db_status = subparsers.add_parser("db-status")
+    db_status.add_argument("--config", default="config/bot.sample.toml")
+    db_status.add_argument("--db-path")
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -376,6 +380,25 @@ def main(argv: list[str] | None = None) -> int:
             f"orchestrator={summary.orchestrator_activities}"
         )
         return 0
+
+    if args.command == "db-status":
+        try:
+            config = load_config(Path(args.config))
+            db_path = Path(args.db_path) if args.db_path else default_database_path(config.data_root)
+            status = load_database_status(config.data_root, db_path)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"db status failed: {exc}")
+            return 2
+
+        print(
+            "db status: "
+            f"path={status.db_path}, exists={str(status.exists).lower()}, "
+            f"size_bytes={status.size_bytes}, total_rows={status.total_rows}, "
+            f"updated_at_utc={status.updated_at_utc or '-'}"
+        )
+        for table in status.tables:
+            print(f"table: {table.table} rows={table.rows}")
+        return 0 if status.exists else 2
 
     if args.command == "sync-ohlcv":
         try:

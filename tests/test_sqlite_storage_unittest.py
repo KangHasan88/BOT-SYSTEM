@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from trading_bot.storage import import_runtime_data, init_database
+from trading_bot.storage import import_runtime_data, init_database, load_database_status
 
 
 class SqliteStorageTest(unittest.TestCase):
@@ -51,6 +51,22 @@ class SqliteStorageTest(unittest.TestCase):
         self.assertEqual(1, counts["paper_trades"])
         self.assertEqual(1, counts["paper_account_snapshots"])
         self.assertEqual(1, counts["audit_events"])
+        self.assertEqual(1, counts["orchestrator_activity"])
+
+    def test_database_status_reports_counts(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            root = Path(tmpdir) / "data"
+            db_path = Path(tmpdir) / "bot.sqlite3"
+            _write_runtime_files(root)
+            import_runtime_data(root, db_path)
+
+            status = load_database_status(root, db_path)
+
+        counts = {table.table: table.rows for table in status.tables}
+        self.assertTrue(status.exists)
+        self.assertGreater(status.size_bytes, 0)
+        self.assertEqual(6, status.total_rows)
+        self.assertEqual(1, counts["market_candles"])
         self.assertEqual(1, counts["orchestrator_activity"])
 
 
