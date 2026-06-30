@@ -121,13 +121,13 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
     try:
         config = load_config(Path(config_path))
         root = Path(config.data_root)
-        checks.append(SetupCheck("Config", "PASS", "config file is valid", ""))
+        checks.append(SetupCheck("Config", "PASS", "file config valid", ""))
         checks.append(
             SetupCheck(
                 "Live Guard",
                 "PASS" if not config.live_enabled else "FAIL",
-                "live is disabled" if not config.live_enabled else "live must be disabled",
-                "Keep BOT_LIVE_ENABLED=false",
+                "live nonaktif" if not config.live_enabled else "live wajib nonaktif",
+                "Pastikan BOT_LIVE_ENABLED=false",
             )
         )
         checks.append(
@@ -135,7 +135,7 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
                 "Data Root",
                 "PASS" if root.exists() else "TODO",
                 str(root),
-                "Click Run Cycle or Sync to create data files",
+                "Klik Jalankan Siklus atau Sinkron untuk membuat data",
             )
         )
         checks.append(
@@ -143,7 +143,7 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
                 "Security QA",
                 "PASS" if _json_value(root / "qa" / "security" / "report.json", "status", "") == "PASSED" else "TODO",
                 _json_value(root / "qa" / "security" / "report.json", "status", "missing"),
-                "Click Security QA",
+                "Klik Security QA",
             )
         )
         checks.append(
@@ -151,19 +151,19 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
                 "Dashboard",
                 "PASS" if (root / "dashboard" / "index.html").exists() else "TODO",
                 str(root / "dashboard" / "index.html"),
-                "Click Build Dashboard",
+                "Klik Buat Dashboard",
             )
         )
         checks.append(
             SetupCheck(
                 "First Run",
                 "PASS" if recent_activities(root, limit=1) else "TODO",
-                "orchestrator activity exists" if recent_activities(root, limit=1) else "no UI action yet",
-                "Click Validate Config, then Run Cycle",
+                "aktivitas orchestrator sudah ada" if recent_activities(root, limit=1) else "belum ada aksi UI",
+                "Klik Validasi Config, lalu Jalankan Siklus",
             )
         )
     except (ConfigError, ValueError) as exc:
-        checks.append(SetupCheck("Config", "FAIL", str(exc), "Fix config file"))
+        checks.append(SetupCheck("Config", "FAIL", str(exc), "Perbaiki file config"))
     return checks
 
 
@@ -196,7 +196,7 @@ def load_incident_panel(config_path: str | Path = "config/bot.sample.toml") -> I
         incident_status=str(report.get("status", "MISSING")),
         incident_generated_at_utc=str(report.get("generated_at_utc", "")),
         scenario_count=len(scenario_names),
-        scenario_summary=", ".join(scenario_names) if scenario_names else "no incident drill report yet",
+        scenario_summary=", ".join(scenario_names) if scenario_names else "belum ada laporan incident drill",
     )
 
 
@@ -334,7 +334,7 @@ def build_orchestrator_page(
     health = health or HealthSummary("MISSING", "", "MISSING", "", "MISSING", "", "MISSING", "")
     setup_checks = setup_checks or []
     reports = reports or []
-    incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "no incident drill report yet")
+    incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "belum ada laporan incident drill")
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -343,14 +343,15 @@ def build_orchestrator_page(
     reports_html = _reports_html(reports)
     incident_html = _incident_html(incident)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
-    live_text = "LIVE ENABLED" if status.live_enabled else "Live Disabled"
-    kill_text = "ACTIVE" if status.kill_switch_active else "Clear"
+    live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
+    kill_text = "AKTIF" if status.kill_switch_active else "Clear"
+    current_action = status.running_action if status.action_running else "siap"
     return f"""<!doctype html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trading Bot Orchestrator</title>
+  <title>Orchestrator Bot Trading</title>
   <link rel="preconnect" href="https://fonts.bunny.net">
   <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800" rel="stylesheet">
   <style>
@@ -425,12 +426,12 @@ def build_orchestrator_page(
       <div class="board-title">
         <div class="title-icon">{_svg_icon("board")}</div>
         <div>
-          <h1>Trading Bot Orchestrator</h1>
+          <h1>Orchestrator Bot Trading</h1>
           <div class="header-meta">
             <span>Mode: {escape(status.mode)}</span>
             <span>Data: {escape(status.data_root)}</span>
-            <span>Live: {"enabled" if status.live_enabled else "disabled"}</span>
-            <span>Action: {escape(status.running_action if status.action_running else "idle")}</span>
+            <span>Live: {"aktif" if status.live_enabled else "nonaktif"}</span>
+            <span>Aksi: {escape(current_action)}</span>
           </div>
         </div>
       </div>
@@ -440,63 +441,63 @@ def build_orchestrator_page(
     </section>
     <section class="grid">
       {_metric("Mode", status.mode)}
-      {_metric("Safety", f'<span class="badge {safety_class}">{escape(live_text)}</span>')}
+      {_metric("Keamanan", f'<span class="badge {safety_class}">{escape(live_text)}</span>')}
       {_metric("Kill Switch", f'<span class="badge {"danger" if status.kill_switch_active else "ok"}">{escape(kill_text)}</span>')}
       {_metric("Go/No-Go", status.go_no_go_decision)}
       {_metric("Security QA", status.security_status)}
       {_metric("Production Smoke", status.production_smoke_status)}
-      {_metric("Action Lock", status.running_action if status.action_running else "Idle")}
+      {_metric("Lock Aksi", current_action)}
     </section>
     <section class="panel">
-      <h2>Bot Health</h2>
+      <h2>Status Bot</h2>
       <div class="grid">{health_html}</div>
     </section>
     <section class="panel">
-      <h2>Quick Setup</h2>
+      <h2>Setup Cepat</h2>
       <div>{setup_html}</div>
-      <p class="small">Recommended first run: Validate Config, Security QA, Build Dashboard, then Run Cycle.</p>
+      <p class="small">Urutan awal yang disarankan: Validasi Config, Security QA, Buat Dashboard, lalu Jalankan Siklus.</p>
     </section>
     <section class="panel">
-      <h2>Report Browser</h2>
+      <h2>Browser Laporan</h2>
       <div>{reports_html}</div>
-      <p class="small">Reports are read-only summaries from local paper/research files.</p>
+      <p class="small">Laporan ini read-only dari file lokal paper/research.</p>
     </section>
     <section class="panel">
       <h2>Kill Switch & Incident</h2>
       <div>{incident_html}</div>
       <div class="filters">
-        <input id="kill-reason" placeholder="Reason required to activate">
-        <button type="button" class="btn btn-danger" id="kill-activate">{_svg_icon("stop")}Activate Kill Switch</button>
+        <input id="kill-reason" placeholder="Alasan wajib untuk aktivasi">
+        <button type="button" class="btn btn-danger" id="kill-activate">{_svg_icon("stop")}Aktifkan Kill Switch</button>
         <button type="button" class="btn" id="kill-clear">{_svg_icon("refresh")}Clear Kill Switch</button>
       </div>
-      <p class="small">Kill switch blocks bot cycles. Incident drill is available as a safe action above.</p>
+      <p class="small">Kill switch memblokir siklus bot. Incident drill tersedia sebagai aksi aman di toolbar.</p>
     </section>
     <section class="panel">
-      <h2>Safe Actions</h2>
-      <label class="small" for="limit">Candle limit</label>
+      <h2>Aksi Aman</h2>
+      <label class="small" for="limit">Limit candle</label>
       <input id="limit" type="number" min="1" max="1000" value="10" style="width:100px; margin:0 0 10px 8px;">
-      <p class="small">All actions run CLI commands in paper/research mode. No live order action is exposed here.</p>
+      <p class="small">Semua aksi berjalan di mode paper/research. Tidak ada tombol live buy/sell/order di UI ini.</p>
     </section>
     <section class="panel">
-      <h2>Paths</h2>
-      <p>Data root: <strong>{escape(status.data_root)}</strong></p>
-      <p>Static dashboard: <strong>{escape(status.dashboard_path)}</strong></p>
+      <h2>Path</h2>
+      <p>Root data: <strong>{escape(status.data_root)}</strong></p>
+      <p>Dashboard statis: <strong>{escape(status.dashboard_path)}</strong></p>
     </section>
     <section class="panel">
-      <h2>Activity</h2>
+      <h2>Aktivitas</h2>
       <div id="activity">{activity_html}</div>
     </section>
     <section class="panel">
-      <h2>Audit Timeline</h2>
+      <h2>Timeline Audit</h2>
       <div class="filters">
         <select id="audit-level">
-          <option value="">All Levels</option>
+          <option value="">Semua Level</option>
           <option value="INFO">INFO</option>
           <option value="WARNING">WARNING</option>
           <option value="ERROR">ERROR</option>
           <option value="CRITICAL">CRITICAL</option>
         </select>
-        <input id="audit-symbol" placeholder="Symbol">
+        <input id="audit-symbol" placeholder="Simbol">
         <input id="audit-timeframe" placeholder="Timeframe">
         <button type="button" class="btn" id="audit-refresh">{_svg_icon("refresh")}Refresh</button>
       </div>
@@ -511,7 +512,7 @@ def build_orchestrator_page(
     for (const button of document.querySelectorAll('button[data-action]')) {{
       button.addEventListener('click', async () => {{
         button.disabled = true;
-        button.textContent = 'Running...';
+        button.textContent = 'Berjalan...';
         await fetch('/api/actions', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json'}},
@@ -538,8 +539,8 @@ def build_orchestrator_page(
         body: JSON.stringify({{action, reason}})
       }});
       if (!res.ok) {{
-        const payload = await res.json().catch(() => ({{error: 'request failed'}}));
-        alert(payload.error || 'request failed');
+        const payload = await res.json().catch(() => ({{error: 'request gagal'}}));
+        alert(payload.error || 'request gagal');
         return;
       }}
       window.location.reload();
@@ -748,7 +749,7 @@ def _metric(label: str, value: object) -> str:
 
 def _activity_html(activities: list[OrchestratorActivity]) -> str:
     if not activities:
-        return '<p class="small">No orchestrator activity yet.</p>'
+        return '<p class="small">Belum ada aktivitas orchestrator.</p>'
     return "".join(
         '<div class="activity">'
         f'<div><strong>{escape(row.action)}</strong> '
@@ -762,7 +763,7 @@ def _activity_html(activities: list[OrchestratorActivity]) -> str:
 
 def _audit_html(events: list[AuditEvent]) -> str:
     if not events:
-        return '<p class="small">No audit events yet.</p>'
+        return '<p class="small">Belum ada event audit.</p>'
     return "".join(
         '<div class="activity">'
         f'<div><strong>{escape(row.event)}</strong> '
@@ -780,8 +781,8 @@ def _health_html(health: HealthSummary) -> str:
         [
             _health_card("Data", health.data_status, health.data_reason),
             _health_card("Paper", health.paper_status, health.paper_reason),
-            _health_card("Readiness", health.readiness_status, health.readiness_reason),
-            _health_card("Safety", health.safety_status, health.safety_reason),
+            _health_card("Kesiapan Live", health.readiness_status, health.readiness_reason),
+            _health_card("Keamanan", health.safety_status, health.safety_reason),
         ]
     )
 
@@ -799,7 +800,7 @@ def _health_card(label: str, status: str, reason: str) -> str:
 
 def _setup_html(checks: list[SetupCheck]) -> str:
     if not checks:
-        return '<p class="small">Setup checks are not available.</p>'
+        return '<p class="small">Checklist setup belum tersedia.</p>'
     rows = []
     for check in checks:
         css = "ok" if check.status == "PASS" else "danger" if check.status == "FAIL" else "warn"
@@ -813,7 +814,7 @@ def _setup_html(checks: list[SetupCheck]) -> str:
         )
     return (
         '<table class="data-table">'
-        "<thead><tr><th>Check</th><th>Status</th><th>Reason</th><th>Next</th></tr></thead>"
+        "<thead><tr><th>Check</th><th>Status</th><th>Alasan</th><th>Berikutnya</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
         + "</tbody></table>"
@@ -822,7 +823,7 @@ def _setup_html(checks: list[SetupCheck]) -> str:
 
 def _reports_html(reports: list[ReportItem]) -> str:
     if not reports:
-        return '<p class="small">No reports found yet. Run Backtest, Walk-Forward, Paper, or Daily Journal actions first.</p>'
+        return '<p class="small">Belum ada laporan. Jalankan Backtest, Walk-Forward, Paper, atau Daily Journal terlebih dahulu.</p>'
     rows = []
     for report in reports[:20]:
         css = _report_status_class(report.status)
@@ -838,7 +839,7 @@ def _reports_html(reports: list[ReportItem]) -> str:
         )
     return (
         '<table class="data-table">'
-        "<thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Summary</th><th>Path</th><th>Updated</th></tr></thead>"
+        "<thead><tr><th>Tipe</th><th>Nama</th><th>Status</th><th>Ringkasan</th><th>Path</th><th>Update</th></tr></thead>"
         "<tbody>"
         + "".join(rows)
         + "</tbody></table>"
@@ -851,9 +852,9 @@ def _incident_html(panel: IncidentPanel) -> str:
     return (
         '<div class="grid">'
         + _metric("Kill Switch", f'<span class="badge {kill_css}">{"ACTIVE" if panel.kill_switch_active else "CLEAR"}</span>')
-        + _metric("Kill Reason", panel.kill_switch_reason or "-")
+        + _metric("Alasan Kill", panel.kill_switch_reason or "-")
         + _metric("Incident Drill", f'<span class="badge {incident_css}">{escape(panel.incident_status)}</span>')
-        + _metric("Scenarios", f"{panel.scenario_count}: {panel.scenario_summary}")
+        + _metric("Skenario", f"{panel.scenario_count}: {panel.scenario_summary}")
         + "</div>"
     )
 
@@ -970,7 +971,18 @@ def _context_summary(context: dict) -> str:
 
 
 def _action_label(action: str) -> str:
-    return action.replace("_", " ").title()
+    labels = {
+        "validate_config": "Validasi Config",
+        "build_dashboard": "Buat Dashboard",
+        "security_qa": "Security QA",
+        "production_smoke": "Production Smoke",
+        "incident_drill": "Incident Drill",
+        "live_go_no_go": "Live Go/No-Go",
+        "run_cycle": "Jalankan Siklus",
+        "sync_btc_15m": "Sinkron BTC 15m",
+        "sync_eth_15m": "Sinkron ETH 15m",
+    }
+    return labels.get(action, action.replace("_", " ").title())
 
 
 def _json_reports(root: Path) -> list[dict]:

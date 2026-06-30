@@ -1,143 +1,146 @@
-# Local Web Orchestrator
+# Orchestrator Web Lokal
 
-The local web orchestrator is the first interactive browser UI for the bot. It
-runs on localhost and only exposes safe paper/research commands.
+Orchestrator web lokal adalah UI browser pertama untuk mengendalikan bot dari
+laptop. UI ini jalan di localhost dan hanya membuka aksi aman untuk mode
+paper/research.
 
-UI layout, spacing, and interaction patterns should follow
-`docs/ui-design-reference.md`, which uses the existing Kanban board as the
-visual reference.
+Layout, spacing, card, table, font, dan pola interaksinya mengikuti
+`docs/ui-design-reference.md`, dengan Kanban sebagai referensi visual. Default
+bahasa UI adalah Bahasa Indonesia, sementara istilah teknis seperti Kill Switch,
+Security QA, Go/No-Go, dan paper/research tetap dipakai agar konsisten dengan
+backlog dan laporan.
 
-## Start
+## Mulai
 
-Open PowerShell from the project root:
+Buka PowerShell dari root project:
 
 ```powershell
 cd C:\Users\IT-MGR\Documents\Codex\2026-06-28\bro-2
 & 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli serve-orchestrator --config config/bot.sample.toml --host 127.0.0.1 --port 8000
 ```
 
-Then open:
+Lalu buka:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-For the easier local launcher, double-click:
+Cara paling gampang, double-click:
 
 ```text
 start-bot-web.cmd
 ```
 
-Or run:
+Atau jalankan:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local-orchestrator.ps1
 ```
 
-The launcher starts the web orchestrator in the background, stores the process
-id in `work/orchestrator/local-web.pid`, waits for `/api/setup`, and opens the
-browser when ready.
+Launcher akan menjalankan orchestrator di background, menyimpan process id ke
+`work/orchestrator/local-web.pid`, menunggu `/api/setup`, lalu membuka browser
+ketika sudah siap.
 
-To stop it:
+Untuk stop:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orchestrator.ps1
 ```
 
-## Safe Actions
+## Aksi Aman
 
-- validate config;
-- build static dashboard;
-- security QA;
-- production smoke;
-- live go/no-go report;
-- offline-safe run cycle;
-- sync latest BTC/USDT 15m;
-- sync latest ETH/USDT 15m.
+- Validasi Config;
+- Buat Dashboard statis;
+- Security QA;
+- Production Smoke;
+- Live Go/No-Go report;
+- Jalankan Siklus offline-safe;
+- Sinkron data terbaru BTC/USDT 15m;
+- Sinkron data terbaru ETH/USDT 15m.
 
-The candle limit input is capped at 1-1000. The orchestrator writes an
-`action.lock` file while a command is running so another browser click cannot
-start a conflicting command.
+Input limit candle dibatasi 1-1000. Saat command sedang berjalan, orchestrator
+menulis file `action.lock` agar klik browser lain tidak memulai command yang
+bentrok.
 
-No live buy/sell/order button is available in this UI.
+Tidak ada tombol live buy/sell/order di UI ini.
 
-## Bot Health
+## Status Bot
 
-The home page summarizes:
+Halaman utama merangkum:
 
-- data quality gate status;
-- paper trade count and net PnL;
-- live go/no-go and readiness status;
-- kill switch, live flag, and security status.
+- status data quality gate;
+- jumlah trade paper dan net PnL;
+- status live go/no-go dan readiness;
+- kill switch, live flag, dan status security.
 
-Danger states such as `BLOCKED` and `NO_GO` are shown as visible badges.
+Status bahaya seperti `BLOCKED` dan `NO_GO` ditampilkan sebagai badge yang jelas.
 
-## Quick Setup
+## Setup Cepat
 
-The home page includes a first-run checklist for:
+Halaman utama punya checklist first-run untuk:
 
-- config validity;
-- live guard disabled;
-- market data root availability;
-- security QA report;
-- generated dashboard;
-- first recorded UI action.
+- validitas config;
+- live guard nonaktif;
+- ketersediaan root data market;
+- report Security QA;
+- dashboard yang sudah dibuat;
+- aksi UI pertama yang tercatat.
 
-The same status is available as JSON at:
+Status yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/setup
 ```
 
-## Report Browser
+## Browser Laporan
 
-The page includes a read-only report browser for:
+Halaman ini punya browser laporan read-only untuk:
 
-- backtest metrics;
-- walk-forward validation;
-- paper orders, trades, and account snapshots;
-- daily market journals.
+- metrik backtest;
+- validasi walk-forward;
+- order, trade, dan snapshot akun paper;
+- jurnal market harian.
 
-The same summary is available as JSON at:
+Ringkasan yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/reports
 ```
 
-## Kill Switch And Incident Panel
+## Kill Switch Dan Incident Panel
 
-The home page includes a guided safety panel for:
+Halaman utama punya panel safety untuk:
 
-- current kill switch status and reason;
-- manual kill switch activation with a required reason;
-- kill switch clear after operator review;
-- latest incident drill status and scenario summary.
+- status dan alasan kill switch saat ini;
+- aktivasi manual kill switch dengan alasan wajib;
+- clear kill switch setelah review operator;
+- status incident drill terbaru dan ringkasan skenario.
 
-The incident drill can be run from the Safe Actions section. The panel status is
-available as JSON at:
+Incident drill bisa dijalankan dari bagian Aksi Aman. Status panel tersedia
+sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/incident
 ```
 
-## Activity
+## Aktivitas
 
-Every UI action writes an activity record to:
+Setiap aksi UI menulis catatan aktivitas ke:
 
 ```text
 work/market_data/orchestrator/activity.jsonl
 ```
 
-The latest activity output is shown on the page.
+Output aktivitas terbaru ditampilkan di halaman.
 
 ## Audit Timeline
 
-The page also reads:
+Halaman ini juga membaca:
 
 ```text
 work/market_data/logs/audit.jsonl
 ```
 
-Audit events can be filtered by level, symbol, and timeframe. The timeline marks
-`ERROR` and `CRITICAL` events clearly and refreshes periodically without
-restarting the bot.
+Event audit bisa difilter berdasarkan level, simbol, dan timeframe. Timeline
+menandai `ERROR` dan `CRITICAL` dengan jelas dan refresh berkala tanpa restart
+bot.
