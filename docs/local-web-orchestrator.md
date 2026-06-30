@@ -3,6 +3,10 @@
 The local web orchestrator is the first interactive browser UI for the bot. It
 runs on localhost and only exposes safe paper/research commands.
 
+UI layout, spacing, and interaction patterns should follow
+`docs/ui-design-reference.md`, which uses the existing Kanban board as the
+visual reference.
+
 ## Start
 
 Open PowerShell from the project root:
