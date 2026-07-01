@@ -59,6 +59,19 @@ class PaperStabilityTest(unittest.TestCase):
         self.assertEqual(1, report.critical_error_count)
         self.assertIn("critical_error_count 1 > allowed 0", report.blockers)
 
+    def test_ignores_expected_drill_audit_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _write_paper_fixture(root, trade_count=20, day_count=14)
+            logger = JsonlAuditLogger(root)
+            logger.write("incident_bot_crash", "bot crash simulated during drill", level="CRITICAL")
+            logger.write("cycle_blocked", "kill switch active", level="CRITICAL", reason="manual safe shutdown drill")
+
+            report = evaluate_paper_stability(root, "BTC/USDT", "15m")
+
+        self.assertEqual("PAPER_STABLE", report.status)
+        self.assertEqual(0, report.critical_error_count)
+
     def test_saves_report_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

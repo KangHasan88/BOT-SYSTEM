@@ -25,6 +25,7 @@ from trading_bot.pattern_analyzer import PatternCsvStore, detect_price_action_pa
 from trading_bot.post_trade import generate_post_trade_report, load_paper_trades, save_post_trade_report
 from trading_bot.qa import (
     DataQualityGateConfig,
+    EvidenceCampaignConfig,
     PaperStabilityConfig,
     evaluate_data_quality_gate,
     evaluate_live_go_no_go,
@@ -35,12 +36,14 @@ from trading_bot.qa import (
     run_incident_drill,
     run_risk_guard_drill,
     save_data_quality_gate_report,
+    run_evidence_campaign,
     save_incident_drill_report,
     save_live_go_no_go_report,
     save_paper_stability_report,
     save_production_smoke_report,
     save_risk_guard_drill_report,
     save_security_qa_report,
+    save_evidence_campaign_report,
     save_vps_readiness_report,
 )
 from trading_bot.reports.backtest import save_backtest_metrics_report
@@ -293,6 +296,21 @@ def build_parser() -> argparse.ArgumentParser:
     evidence = subparsers.add_parser("live-evidence-report")
     evidence.add_argument("--config", default="config/bot.sample.toml")
     evidence.add_argument("--min-paper-trades", type=int, default=20)
+
+    campaign = subparsers.add_parser("evidence-campaign-report")
+    campaign.add_argument("--config", default="config/bot.sample.toml")
+    campaign.add_argument("--seed-demo-if-needed", action="store_true")
+    campaign.add_argument("--candles-per-pair", type=int, default=500)
+    campaign.add_argument("--min-candles", type=int, default=360)
+    campaign.add_argument("--initial-equity", type=float, default=1_000.0)
+    campaign.add_argument("--min-notional", type=float, default=1.0)
+    campaign.add_argument("--min-paper-trades", type=int, default=20)
+    campaign.add_argument("--paper-min-days", type=int, default=14)
+    campaign.add_argument("--paper-min-trades", type=int, default=20)
+    campaign.add_argument("--walk-forward-train-candles", type=int, default=240)
+    campaign.add_argument("--walk-forward-test-candles", type=int, default=120)
+    campaign.add_argument("--walk-forward-step-candles", type=int, default=120)
+    campaign.add_argument("--walk-forward-min-test-trades", type=int, default=5)
 
     live_plan = subparsers.add_parser("live-phase-one-plan")
     live_plan.add_argument("--config", default="config/bot.sample.toml")
@@ -1183,6 +1201,44 @@ def main(argv: list[str] | None = None) -> int:
         for blocker in report.blockers:
             print(f"blocker: {blocker}")
         return 0 if report.status == "COMPLETE_FOR_OWNER_REVIEW" else 2
+
+    if args.command == "evidence-campaign-report":
+        try:
+            config = load_config(Path(args.config))
+            report = run_evidence_campaign(
+                config,
+                EvidenceCampaignConfig(
+                    seed_demo_if_needed=args.seed_demo_if_needed,
+                    candles_per_pair=args.candles_per_pair,
+                    min_candles=args.min_candles,
+                    initial_equity=args.initial_equity,
+                    min_notional=args.min_notional,
+                    min_paper_trades=args.min_paper_trades,
+                    paper_min_days=args.paper_min_days,
+                    paper_min_trades=args.paper_min_trades,
+                    walk_forward_train_candles=args.walk_forward_train_candles,
+                    walk_forward_test_candles=args.walk_forward_test_candles,
+                    walk_forward_step_candles=args.walk_forward_step_candles,
+                    walk_forward_min_test_trades=args.walk_forward_min_test_trades,
+                ),
+            )
+            path = save_evidence_campaign_report(report, config.data_root)
+        except (ConfigError, ValueError) as exc:
+            print(f"evidence campaign failed: {exc}")
+            return 2
+
+        print(
+            "evidence campaign: "
+            f"status={report.status}, seeded_demo_data={str(report.seeded_demo_data).lower()}, "
+            f"pairs={report.pairs_checked}, pass={report.pass_count}, blocked={report.blocked_count}, "
+            f"live_evidence={report.live_evidence_status}, completion={report.live_evidence_completion_pct:.2f}, "
+            f"path={path}"
+        )
+        for step in report.steps:
+            if step.status not in {"PASSED", "PASS", "PAPER_CANDIDATE", "PAPER_STABLE"}:
+                scope = f"{step.symbol} {step.timeframe}".strip()
+                print(f"blocker: {step.name} {scope}: {step.status} {step.reason}".strip())
+        return 0
 
     if args.command == "live-phase-one-plan":
         try:

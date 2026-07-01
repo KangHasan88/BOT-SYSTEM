@@ -17,6 +17,7 @@ class PaperStabilityConfig:
     max_critical_errors: int = 0
     max_rejected_order_pct: float = 35.0
     max_stop_loss_pct: float = 60.0
+    ignore_drill_events: bool = True
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ def evaluate_paper_stability(
         event
         for event in read_audit_events(root_path)
         if event.level.upper() in {"ERROR", "CRITICAL"}
+        and not (qa_config.ignore_drill_events and _is_expected_drill_event(event.event, event.context))
     ]
 
     rejected_orders = [order for order in orders if order.get("status", "").upper() == "REJECTED"]
@@ -147,6 +149,13 @@ def _observed_days(
 
 def _date_from_ms(value: int) -> str:
     return datetime.fromtimestamp(value / 1000, tz=timezone.utc).date().isoformat()
+
+
+def _is_expected_drill_event(event_name: str, context: dict) -> bool:
+    if event_name.startswith("incident_"):
+        return True
+    reason = str(context.get("reason", "")).lower()
+    return "drill" in reason
 
 
 def _pct(part: int, whole: int) -> float:

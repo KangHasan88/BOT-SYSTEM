@@ -58,6 +58,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 - Production Smoke;
 - Live Go/No-Go report;
 - Live Evidence gate;
+- Evidence Campaign untuk refresh seluruh bukti readiness lokal;
 - Jalankan Siklus offline-safe;
 - Sinkron data terbaru BTC/USDT 15m;
 - Sinkron data terbaru ETH/USDT 15m.
@@ -159,6 +160,15 @@ Ringkasan yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/live-evidence
+```
+
+Tombol `Evidence Campaign` menjalankan rangkaian aman untuk demo/paper:
+data quality gate, backtest report, walk-forward report, paper stability,
+live readiness, Go/No-Go, lalu Live Evidence. Jika data lokal belum cukup,
+aksi ini mengisi demo data lokal terlebih dahulu. Hasil ringkas disimpan ke:
+
+```text
+work/market_data/readiness/evidence_campaign.json
 ```
 
 ## Kill Switch Dan Incident Panel

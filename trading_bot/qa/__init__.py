@@ -4,6 +4,13 @@ from trading_bot.qa.data_quality import (
     evaluate_data_quality_gate,
     save_data_quality_gate_report,
 )
+from trading_bot.qa.evidence_campaign import (
+    EvidenceCampaignConfig,
+    EvidenceCampaignReport,
+    EvidenceCampaignStep,
+    run_evidence_campaign,
+    save_evidence_campaign_report,
+)
 from trading_bot.qa.incident_drill import (
     IncidentDrillReport,
     IncidentScenarioResult,
@@ -47,8 +54,13 @@ __all__ = [
     "PaperStabilityReport",
     "DataQualityGateConfig",
     "DataQualityGateReport",
+    "EvidenceCampaignConfig",
+    "EvidenceCampaignReport",
+    "EvidenceCampaignStep",
     "evaluate_data_quality_gate",
+    "run_evidence_campaign",
     "save_data_quality_gate_report",
+    "save_evidence_campaign_report",
     "IncidentDrillReport",
     "IncidentScenarioResult",
     "run_incident_drill",

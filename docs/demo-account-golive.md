@@ -20,6 +20,7 @@ python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 python -m trading_bot.cli testnet-demo-report --config config/bot.sample.toml --environment testnet
+python -m trading_bot.cli evidence-campaign-report --config config/bot.sample.toml --seed-demo-if-needed
 python -m trading_bot.cli live-evidence-report --config config/bot.sample.toml --min-paper-trades 20
 python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
 ```
@@ -45,6 +46,10 @@ work/market_data/readiness/live_evidence.json
 
 Status `INCOMPLETE` adalah normal sampai paper campaign, stability report,
 readiness, dan go/no-go lengkap.
+
+`evidence-campaign-report` bisa dipakai sebelum membaca live evidence. Command
+ini refresh data quality, backtest, walk-forward, paper stability, readiness,
+Go/No-Go, dan live evidence dalam satu jalur aman demo/paper.
 
 ## Guard
 

@@ -28,6 +28,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "incident_drill": ("incident-drill-report", "--config", "{config}"),
     "live_go_no_go": ("live-go-no-go-report", "--config", "{config}"),
     "live_evidence": ("live-evidence-report", "--config", "{config}"),
+    "evidence_campaign": ("evidence-campaign-report", "--config", "{config}", "--seed-demo-if-needed"),
     "testnet_demo": ("testnet-demo-report", "--config", "{config}", "--environment", "testnet"),
     "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
@@ -873,7 +874,7 @@ def _action_icon(action: str) -> str:
         return _svg_icon("refresh")
     if "demo" in action:
         return _svg_icon("database")
-    if "security" in action or "go_no_go" in action or "incident" in action or "testnet" in action:
+    if "security" in action or "go_no_go" in action or "incident" in action or "testnet" in action or "evidence" in action:
         return _svg_icon("shield")
     if "dashboard" in action:
         return _svg_icon("chart")
@@ -1284,6 +1285,7 @@ def _action_label(action: str) -> str:
         "incident_drill": "Incident Drill",
         "live_go_no_go": "Live Go/No-Go",
         "live_evidence": "Live Evidence",
+        "evidence_campaign": "Evidence Campaign",
         "testnet_demo": "Testnet Demo",
         "run_cycle": "Jalankan Siklus",
         "sync_btc_15m": "Sinkron BTC 15m",
