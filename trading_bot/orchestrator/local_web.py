@@ -27,6 +27,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
     "incident_drill": ("incident-drill-report", "--config", "{config}"),
     "live_go_no_go": ("live-go-no-go-report", "--config", "{config}"),
+    "live_evidence": ("live-evidence-report", "--config", "{config}"),
     "testnet_demo": ("testnet-demo-report", "--config", "{config}", "--environment", "testnet"),
     "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
@@ -123,6 +124,19 @@ class TestnetDemoPanel:
     live_guard_reason: str
     orders: list[dict]
     notes: list[str]
+
+
+@dataclass(frozen=True)
+class LiveEvidencePanel:
+    report_path: str
+    exists: bool
+    status: str
+    completion_pct: float
+    generated_at_utc: str
+    blocker_count: int
+    summary: str
+    blockers: list[str]
+    items: list[dict]
 
 
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
@@ -222,6 +236,7 @@ def load_report_browser(config_path: str | Path = "config/bot.sample.toml") -> l
     reports.extend(_json_report_items(root / "reports" / "daily", "Daily Journal", "*.json"))
     reports.extend(_json_report_items(root / "reports" / "learning", "Learning", "*.json"))
     reports.extend(_json_report_items(root / "execution" / "testnet_demo", "Testnet Demo", "*.json"))
+    reports.extend(_json_report_items(root / "readiness", "Readiness", "*.json"))
     return sorted(reports, key=lambda item: item.updated_at_utc, reverse=True)
 
 
@@ -269,6 +284,25 @@ def load_testnet_demo_panel(config_path: str | Path = "config/bot.sample.toml") 
         live_guard_reason=str(payload.get("live_guard_reason", "")),
         orders=orders if isinstance(orders, list) else [],
         notes=notes if isinstance(notes, list) else [],
+    )
+
+
+def load_live_evidence_panel(config_path: str | Path = "config/bot.sample.toml") -> LiveEvidencePanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "readiness" / "live_evidence.json"
+    payload = _read_json(path) or {}
+    blockers = payload.get("blockers", [])
+    items = payload.get("items", [])
+    return LiveEvidencePanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        completion_pct=float(payload.get("completion_pct", 0) or 0),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        blocker_count=len(blockers) if isinstance(blockers, list) else 0,
+        summary=str(payload.get("summary", "")),
+        blockers=blockers if isinstance(blockers, list) else [],
+        items=items if isinstance(items, list) else [],
     )
 
 
@@ -402,6 +436,7 @@ def build_orchestrator_page(
     incident: IncidentPanel | None = None,
     database: DatabasePanel | None = None,
     testnet_demo: TestnetDemoPanel | None = None,
+    live_evidence: LiveEvidencePanel | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
@@ -411,6 +446,7 @@ def build_orchestrator_page(
     incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "belum ada laporan incident drill")
     database = database or DatabasePanel("", False, 0, "", 0, {})
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
+    live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -420,6 +456,7 @@ def build_orchestrator_page(
     incident_html = _incident_html(incident)
     database_html = _database_html(database)
     testnet_demo_html = _testnet_demo_html(testnet_demo)
+    live_evidence_html = _live_evidence_html(live_evidence)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -551,6 +588,11 @@ def build_orchestrator_page(
       <p class="small">Panel ini read-only dari report demo/testnet. Tidak ada real live order di sini.</p>
     </section>
     <section class="panel">
+      <h2>Live Evidence Gate</h2>
+      <div>{live_evidence_html}</div>
+      <p class="small">Gate ini mengunci real live sampai semua bukti paper, QA, testnet, dan owner review lengkap.</p>
+    </section>
+    <section class="panel">
       <h2>Kill Switch & Incident</h2>
       <div>{incident_html}</div>
       <div class="filters">
@@ -680,6 +722,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/testnet-demo":
                     self._json_response(asdict(load_testnet_demo_panel(config_path)))
                     return
+                if parsed.path == "/api/live-evidence":
+                    self._json_response(asdict(load_live_evidence_panel(config_path)))
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -708,7 +753,21 @@ def _handler_factory(config_path: Path):
                 incident = load_incident_panel(config_path)
                 database = load_database_panel(config_path)
                 testnet_demo = load_testnet_demo_panel(config_path)
-                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident, database, testnet_demo))
+                live_evidence = load_live_evidence_panel(config_path)
+                self._html_response(
+                    build_orchestrator_page(
+                        status,
+                        activities,
+                        audit_events,
+                        health,
+                        setup,
+                        reports,
+                        incident,
+                        database,
+                        testnet_demo,
+                        live_evidence,
+                    )
+                )
             except (ConfigError, ValueError, OSError) as exc:
                 self._json_response({"error": str(exc)}, status=500)
 
@@ -1049,6 +1108,59 @@ def _testnet_demo_html(panel: TestnetDemoPanel) -> str:
     )
 
 
+def _live_evidence_html(panel: LiveEvidencePanel) -> str:
+    if not panel.exists:
+        return (
+            '<p class="small">Belum ada live evidence report. Klik '
+            '<strong>Live Evidence</strong> untuk membuat checklist kesiapan live.</p>'
+        )
+    status_css = _report_status_class(panel.status)
+    blocker_rows = "".join(
+        "<tr>"
+        f"<td>{escape(str(blocker))}</td>"
+        "</tr>"
+        for blocker in panel.blockers[:10]
+    )
+    blocker_table = (
+        '<table class="data-table">'
+        "<thead><tr><th>Blocker</th></tr></thead>"
+        "<tbody>"
+        + (blocker_rows or "<tr><td>Tidak ada blocker aktif.</td></tr>")
+        + "</tbody></table>"
+    )
+    item_rows = []
+    for item in panel.items:
+        if not isinstance(item, dict):
+            continue
+        item_rows.append(
+            "<tr>"
+            f"<td>{escape(str(item.get('name', '')))}</td>"
+            f'<td><span class="badge {_report_status_class(str(item.get("status", "")))}">{escape(str(item.get("status", "")))}</span></td>'
+            f"<td>{escape(str(item.get('reason', '')))}</td>"
+            f"<td>{escape(str(item.get('next_action', '')))}</td>"
+            "</tr>"
+        )
+    item_table = (
+        '<table class="data-table">'
+        "<thead><tr><th>Evidence</th><th>Status</th><th>Alasan</th><th>Aksi Berikutnya</th></tr></thead>"
+        "<tbody>"
+        + "".join(item_rows[:20])
+        + "</tbody></table>"
+    )
+    return (
+        '<div class="grid">'
+        + _metric("Status Evidence", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Completion", f"{panel.completion_pct:.2f}%")
+        + _metric("Blockers", panel.blocker_count)
+        + _metric("Generated", panel.generated_at_utc or "-")
+        + "</div>"
+        + f'<p class="small">{escape(panel.summary or "report available")}</p>'
+        + blocker_table
+        + item_table
+        + f'<p class="small">Path: <code>{escape(panel.report_path)}</code></p>'
+    )
+
+
 def _json_report_items(root: Path, category: str, pattern: str) -> list[ReportItem]:
     if not root.exists():
         return []
@@ -1171,6 +1283,7 @@ def _action_label(action: str) -> str:
         "production_smoke": "Production Smoke",
         "incident_drill": "Incident Drill",
         "live_go_no_go": "Live Go/No-Go",
+        "live_evidence": "Live Evidence",
         "testnet_demo": "Testnet Demo",
         "run_cycle": "Jalankan Siklus",
         "sync_btc_15m": "Sinkron BTC 15m",

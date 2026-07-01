@@ -53,7 +53,7 @@ from trading_bot.research import (
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
 )
-from trading_bot.readiness import evaluate_live_readiness, save_live_readiness_report
+from trading_bot.readiness import evaluate_live_evidence, evaluate_live_readiness, save_live_evidence_report, save_live_readiness_report
 from trading_bot.scheduler import is_entry_allowed_at_ms
 from trading_bot.security import load_env_file, scan_for_secrets, validate_env_security
 from trading_bot.safety import activate_kill_switch, clear_kill_switch, read_kill_switch
@@ -289,6 +289,10 @@ def build_parser() -> argparse.ArgumentParser:
     readiness.add_argument("--env-file", default=".env.example")
     readiness.add_argument("--scan-root", default=".")
     readiness.add_argument("--min-paper-trades", type=int, default=20)
+
+    evidence = subparsers.add_parser("live-evidence-report")
+    evidence.add_argument("--config", default="config/bot.sample.toml")
+    evidence.add_argument("--min-paper-trades", type=int, default=20)
 
     live_plan = subparsers.add_parser("live-phase-one-plan")
     live_plan.add_argument("--config", default="config/bot.sample.toml")
@@ -1161,6 +1165,24 @@ def main(argv: list[str] | None = None) -> int:
         for check in report.checks:
             print(f"{check.status} {check.name}: {check.reason}")
         return 0 if report.status == "READY_FOR_MANUAL_REVIEW" else 2
+
+    if args.command == "live-evidence-report":
+        try:
+            config = load_config(Path(args.config))
+            report = evaluate_live_evidence(config, min_paper_trades=args.min_paper_trades)
+            path = save_live_evidence_report(report, config.data_root)
+        except (ConfigError, ValueError) as exc:
+            print(f"live evidence failed: {exc}")
+            return 2
+
+        print(
+            "live evidence: "
+            f"status={report.status}, completion={report.completion_pct:.2f}, "
+            f"blockers={len(report.blockers)}, path={path}"
+        )
+        for blocker in report.blockers:
+            print(f"blocker: {blocker}")
+        return 0 if report.status == "COMPLETE_FOR_OWNER_REVIEW" else 2
 
     if args.command == "live-phase-one-plan":
         try:

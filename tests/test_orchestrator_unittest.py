@@ -8,11 +8,13 @@ from pathlib import Path
 from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
+    LiveEvidencePanel,
     TestnetDemoPanel,
     build_orchestrator_page,
     load_database_panel,
     load_health_summary,
     load_incident_panel,
+    load_live_evidence_panel,
     load_orchestrator_status,
     load_report_browser,
     load_setup_wizard,
@@ -36,6 +38,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("data-table", html)
         self.assertIn("Demo Data", html)
         self.assertIn("Testnet Demo", html)
+        self.assertIn("Live Evidence", html)
         self.assertIn("Jalankan Siklus", html)
         self.assertIn("Sinkron BTC 15m", html)
         self.assertIn("Import DB", html)
@@ -46,6 +49,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Browser Laporan", html)
         self.assertIn("Database Lokal", html)
         self.assertIn("Demo/Testnet Monitoring", html)
+        self.assertIn("Live Evidence Gate", html)
         self.assertIn("Kill Switch & Incident", html)
         self.assertIn("Tidak ada tombol live buy/sell/order", html)
         self.assertIn("Timeline Audit", html)
@@ -91,6 +95,7 @@ class OrchestratorTest(unittest.TestCase):
             _write_json(data_root / "validation" / "walk_forward" / "BTC_USDT" / "15m.json", {"recommendation": "PASS", "total_test_trades": 30})
             _write_json(data_root / "reports" / "daily" / "BTC_USDT" / "15m" / "2026-06-30.json", {"review_status": "NEUTRAL", "paper_trade_count": 0})
             _write_json(data_root / "execution" / "testnet_demo" / "report.json", {"status": "PASSED", "orders": []})
+            _write_json(data_root / "readiness" / "live_evidence.json", {"status": "INCOMPLETE", "completion_pct": 50})
             paper_path = data_root / "paper" / "BTC_USDT" / "trades.csv"
             paper_path.parent.mkdir(parents=True, exist_ok=True)
             paper_path.write_text("symbol,timeframe,net_pnl\nBTC/USDT,15m,1.2\n", encoding="utf-8")
@@ -103,6 +108,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Paper", categories)
         self.assertIn("Daily Journal", categories)
         self.assertIn("Testnet Demo", categories)
+        self.assertIn("Readiness", categories)
         self.assertTrue(all(report.path for report in reports))
 
     def test_database_panel_renders_local_sqlite_summary(self) -> None:
@@ -179,6 +185,46 @@ class OrchestratorTest(unittest.TestCase):
         self.assertEqual("MISSING", panel.status)
         self.assertIn("testnet_demo", panel.report_path)
 
+    def test_live_evidence_panel_renders_blockers(self) -> None:
+        panel = LiveEvidencePanel(
+            report_path="work/market_data/readiness/live_evidence.json",
+            exists=True,
+            status="INCOMPLETE",
+            completion_pct=46.15,
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            blocker_count=1,
+            summary="7/13 evidence item(s) passed",
+            blockers=["paper_trade_count: paper trades 15 below minimum 20"],
+            items=[
+                {
+                    "name": "paper_trade_count",
+                    "status": "BLOCKED",
+                    "reason": "paper trades 15 below minimum 20",
+                    "next_action": "continue paper campaign",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, live_evidence=panel)
+
+        self.assertIn("Live Evidence Gate", html)
+        self.assertIn("46.15%", html)
+        self.assertIn("paper_trade_count", html)
+        self.assertIn("continue paper campaign", html)
+
+    def test_live_evidence_panel_loader_reports_missing_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+
+            panel = load_live_evidence_panel(config_path)
+
+        self.assertFalse(panel.exists)
+        self.assertEqual("MISSING", panel.status)
+        self.assertIn("live_evidence.json", panel.report_path)
+
     def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -198,6 +244,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("run_cycle", ACTIONS)
         self.assertIn("seed_demo_data", ACTIONS)
         self.assertIn("testnet_demo", ACTIONS)
+        self.assertIn("live_evidence", ACTIONS)
         self.assertIn("import_runtime_db", ACTIONS)
         self.assertIn("db_learning_report", ACTIONS)
         self.assertIn("sync_btc_15m", ACTIONS)

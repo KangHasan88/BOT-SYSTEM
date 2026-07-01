@@ -20,6 +20,7 @@ python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 python -m trading_bot.cli testnet-demo-report --config config/bot.sample.toml --environment testnet
+python -m trading_bot.cli live-evidence-report --config config/bot.sample.toml --min-paper-trades 20
 python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
 ```
 
@@ -35,6 +36,15 @@ dan API read-only:
 ```text
 http://127.0.0.1:8000/api/testnet-demo
 ```
+
+`live-evidence-report` membuat checklist evidence di:
+
+```text
+work/market_data/readiness/live_evidence.json
+```
+
+Status `INCOMPLETE` adalah normal sampai paper campaign, stability report,
+readiness, dan go/no-go lengkap.
 
 ## Guard
 

@@ -117,11 +117,14 @@ Live readiness should stay `BLOCKED` until evidence is complete.
 
 ```bash
 python -m trading_bot.cli live-readiness-report --config config/bot.sample.toml --env-file .env.example --scan-root .
+python -m trading_bot.cli live-evidence-report --config config/bot.sample.toml --min-paper-trades 20
 python -m trading_bot.cli live-phase-one-plan --config config/bot.sample.toml --capital-idr 1000000
 python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 ```
 
 Live phase one is only a plan in v1. It does not route live orders.
+`live-evidence-report` is expected to stay `INCOMPLETE` until paper evidence and
+owner-review evidence are complete.
 
 Demo account / testnet flow:
 

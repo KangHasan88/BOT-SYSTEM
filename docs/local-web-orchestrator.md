@@ -57,6 +57,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 - Security QA;
 - Production Smoke;
 - Live Go/No-Go report;
+- Live Evidence gate;
 - Jalankan Siklus offline-safe;
 - Sinkron data terbaru BTC/USDT 15m;
 - Sinkron data terbaru ETH/USDT 15m.
@@ -140,6 +141,24 @@ Ringkasan yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/testnet-demo
+```
+
+## Live Evidence Gate
+
+Panel `Live Evidence Gate` membaca report dari tombol `Live Evidence`.
+Isinya status kesiapan live, persentase completion, blocker aktif, dan detail
+evidence seperti QA security, data quality, backtest, walk-forward, paper
+stability, incident drill, testnet demo, learning snapshot, readiness, dan
+owner Go/No-Go.
+
+Report ini sengaja boleh `INCOMPLETE`. Itu artinya bot belum boleh real live
+karena masih ada bukti yang kurang, misalnya jumlah trade paper belum cukup
+atau readiness masih `BLOCKED`.
+
+Ringkasan yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/live-evidence
 ```
 
 ## Kill Switch Dan Incident Panel
