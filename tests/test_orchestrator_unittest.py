@@ -22,6 +22,7 @@ from trading_bot.orchestrator import (
     build_orchestrator_page,
     load_database_panel,
     load_demo_walkthrough,
+    load_glossary_entries,
     load_health_summary,
     load_incident_panel,
     load_learning_dashboard_panel,
@@ -71,6 +72,10 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Skill Loop", html)
         self.assertIn("Pattern Memory", html)
         self.assertIn("Learning Dashboard", html)
+        self.assertIn("Kamus Awam", html)
+        self.assertIn("Evidence Score", html)
+        self.assertIn("Arti Awam", html)
+        self.assertIn("title=\"Cek mode bot, live lock, dan simbol tanpa melakukan order.\"", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -92,6 +97,16 @@ class OrchestratorTest(unittest.TestCase):
 
         self.assertFalse(status.live_enabled)
         self.assertIn("work", status.data_root)
+
+    def test_glossary_entries_cover_beginner_terms(self) -> None:
+        entries = load_glossary_entries()
+        terms = {entry.term for entry in entries}
+
+        self.assertIn("Paper/Demo", terms)
+        self.assertIn("P/L", terms)
+        self.assertIn("Evidence Score", terms)
+        self.assertTrue(all(entry.plain_meaning for entry in entries))
+        self.assertTrue(all(entry.related_action for entry in entries))
 
     def test_health_summary_reports_key_domains(self) -> None:
         health = load_health_summary("config/bot.sample.toml")

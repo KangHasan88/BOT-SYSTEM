@@ -101,6 +101,28 @@ ini menampilkan ringkasan kondisi bot, mode akun, P/L demo, evidence live, dan
 Setiap step punya hover message agar user paham arti status tanpa membuka file
 teknis. Panel ini tetap read-only dan tidak menyediakan tombol real live order.
 
+## Kamus Awam
+
+Panel `Kamus Awam` menjelaskan istilah yang sering muncul di control room:
+
+- `Paper/Demo`;
+- `P/L`;
+- `Evidence`;
+- `Evidence Score`;
+- `BUTUH PAPER`;
+- `Pattern Memory`;
+- `Skill Loop`;
+- `Kill Switch`;
+- `Go/No-Go`;
+- `Volume Spike`.
+
+Istilah yang sama dipakai sebagai hover message di tombol dan metric utama.
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/glossary
+```
+
 ## Demo Walkthrough
 
 Panel `Demo Walkthrough` adalah jalur demo lokal 1-6:

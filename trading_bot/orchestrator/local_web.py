@@ -88,6 +88,14 @@ class SetupCheck:
 
 
 @dataclass(frozen=True)
+class GlossaryEntry:
+    term: str
+    plain_meaning: str
+    watch_for: str
+    related_action: str
+
+
+@dataclass(frozen=True)
 class ReportItem:
     category: str
     name: str
@@ -406,6 +414,21 @@ def load_incident_panel(config_path: str | Path = "config/bot.sample.toml") -> I
         scenario_count=len(scenario_names),
         scenario_summary=", ".join(scenario_names) if scenario_names else "belum ada laporan incident drill",
     )
+
+
+def load_glossary_entries() -> list[GlossaryEntry]:
+    return [
+        GlossaryEntry("Paper/Demo", "Simulasi trading tanpa uang asli.", "Hasil bagus belum berarti boleh live.", "Paper Campaign"),
+        GlossaryEntry("P/L", "Profit atau rugi dari trade demo/paper.", "Hijau belum cukup jika sample trade kecil.", "P/L Visual Monitor"),
+        GlossaryEntry("Evidence", "Bukti kesiapan sebelum bot boleh direview untuk live.", "Jika belum 100%, real live tetap terkunci.", "Live Evidence"),
+        GlossaryEntry("Evidence Score", "Skor prioritas review, bukan izin live.", "Score rendah berarti butuh data/paper tambahan.", "Learning Dashboard"),
+        GlossaryEntry("BUTUH PAPER", "Pola masih perlu lebih banyak simulasi trade.", "Minimal 20 paper trade per pair/timeframe.", "Paper Campaign"),
+        GlossaryEntry("Pattern Memory", "Catatan pola dan outcome paper yang pernah terjadi.", "Tambahkan label manual setelah review chart.", "Pattern Memory"),
+        GlossaryEntry("Skill Loop", "Siklus belajar bot dari data, pola, trade, dan evidence.", "Tidak boleh otomatis membuka live order.", "Skill Loop"),
+        GlossaryEntry("Kill Switch", "Rem darurat untuk memblokir aktivitas bot.", "Aktifkan jika ada error, rugi besar, atau market tidak normal.", "Kill Switch"),
+        GlossaryEntry("Go/No-Go", "Keputusan siap/tidak siap untuk review live.", "NO_GO berarti jangan live.", "Live Go/No-Go"),
+        GlossaryEntry("Volume Spike", "Volume tiba-tiba lebih besar dari rata-rata.", "Bisa sinyal penting, tapi perlu konfirmasi.", "Learning Dashboard"),
+    ]
 
 
 def load_database_panel(config_path: str | Path = "config/bot.sample.toml") -> DatabasePanel:
@@ -782,6 +805,7 @@ def build_orchestrator_page(
     health: HealthSummary | None = None,
     setup_checks: list[SetupCheck] | None = None,
     reports: list[ReportItem] | None = None,
+    glossary: list[GlossaryEntry] | None = None,
     incident: IncidentPanel | None = None,
     database: DatabasePanel | None = None,
     testnet_demo: TestnetDemoPanel | None = None,
@@ -800,6 +824,7 @@ def build_orchestrator_page(
     health = health or HealthSummary("MISSING", "", "MISSING", "", "MISSING", "", "MISSING", "")
     setup_checks = setup_checks or []
     reports = reports or []
+    glossary = glossary or load_glossary_entries()
     incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "belum ada laporan incident drill")
     database = database or DatabasePanel("", False, 0, "", 0, {})
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
@@ -818,6 +843,7 @@ def build_orchestrator_page(
     health_html = _health_html(health)
     setup_html = _setup_html(setup_checks)
     reports_html = _reports_html(reports)
+    glossary_html = _glossary_html(glossary)
     incident_html = _incident_html(incident)
     database_html = _database_html(database)
     testnet_demo_html = _testnet_demo_html(testnet_demo)
@@ -958,6 +984,10 @@ def build_orchestrator_page(
     <section class="panel">
       <h2>Control Room Awam</h2>
       <div>{beginner_html}</div>
+    </section>
+    <section class="panel">
+      <h2>Kamus Awam</h2>
+      <div>{glossary_html}</div>
     </section>
     <section class="panel">
       <h2>Demo Walkthrough</h2>
@@ -1158,6 +1188,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/reports":
                     self._json_response({"reports": [asdict(row) for row in load_report_browser(config_path)]})
                     return
+                if parsed.path == "/api/glossary":
+                    self._json_response({"entries": [asdict(row) for row in load_glossary_entries()]})
+                    return
                 if parsed.path == "/api/incident":
                     self._json_response(asdict(load_incident_panel(config_path)))
                     return
@@ -1219,6 +1252,7 @@ def _handler_factory(config_path: Path):
                 health = load_health_summary(config_path)
                 setup = load_setup_wizard(config_path)
                 reports = load_report_browser(config_path)
+                glossary = load_glossary_entries()
                 incident = load_incident_panel(config_path)
                 database = load_database_panel(config_path)
                 testnet_demo = load_testnet_demo_panel(config_path)
@@ -1239,6 +1273,7 @@ def _handler_factory(config_path: Path):
                         health,
                         setup,
                         reports,
+                        glossary,
                         incident,
                         database,
                         testnet_demo,
@@ -1347,9 +1382,11 @@ def _json_value(path: Path, key: str, default: str) -> str:
 
 def _action_button(action: str, disabled: bool) -> str:
     icon = _action_icon(action)
+    label = _action_label(action)
+    title = _help_text_for(label) or label
     return (
         f'<button type="button" class="btn" data-action="{escape(action)}" {"disabled" if disabled else ""} '
-        f'title="{escape(_action_label(action))}">{icon}{escape(_action_label(action))}</button>'
+        f'title="{escape(title)}">{icon}{escape(label)}</button>'
     )
 
 
@@ -1384,11 +1421,30 @@ def _svg_icon(name: str) -> str:
 
 
 def _metric(label: str, value: object) -> str:
+    title = _help_text_for(str(label))
+    title_attr = f' title="{escape(title)}"' if title else ""
     return (
-        '<div class="panel metric">'
+        f'<div class="panel metric"{title_attr}>'
         f"<span>{escape(str(label))}</span>"
         f"<strong>{value if str(value).startswith('<') else escape(str(value))}</strong>"
         "</div>"
+    )
+
+
+def _glossary_html(entries: list[GlossaryEntry]) -> str:
+    rows = "".join(
+        "<tr>"
+        f"<td><strong>{escape(entry.term)}</strong></td>"
+        f"<td>{escape(entry.plain_meaning)}</td>"
+        f"<td>{escape(entry.watch_for)}</td>"
+        f"<td>{escape(entry.related_action)}</td>"
+        "</tr>"
+        for entry in entries
+    )
+    return (
+        '<table class="data-table">'
+        "<thead><tr><th>Istilah</th><th>Arti Awam</th><th>Yang Dipantau</th><th>Aksi Terkait</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
     )
 
 
@@ -2222,6 +2278,33 @@ def _context_summary(context: dict) -> str:
         if value:
             parts.append(f"{key}={value}")
     return " | " + escape(", ".join(parts)) if parts else ""
+
+
+def _help_text_for(label: str) -> str:
+    normalized = label.strip().lower()
+    direct = {
+        entry.term.lower(): f"{entry.plain_meaning} {entry.watch_for}"
+        for entry in load_glossary_entries()
+    }
+    aliases = {
+        "p/l demo": direct["p/l"],
+        "paper net p/l": direct["p/l"],
+        "net p/l paper": direct["p/l"],
+        "realized p/l demo": direct["p/l"],
+        "evidence": direct["evidence"],
+        "avg evidence score": direct["evidence score"],
+        "status dashboard": "Ringkasan apakah dashboard belajar sudah punya data yang bisa dibaca.",
+        "learning dashboard": "Ringkasan pola, volume, outcome paper, dan evidence score.",
+        "validasi config": "Cek mode bot, live lock, dan simbol tanpa melakukan order.",
+        "import db": "Masukkan data CSV/JSON lokal ke SQLite agar bisa dipelajari.",
+        "learning db": "Buat snapshot pola dari database lokal.",
+        "live evidence": direct["evidence"],
+        "paper campaign": direct["paper/demo"],
+        "kill switch": direct["kill switch"],
+    }
+    if normalized in direct:
+        return direct[normalized]
+    return aliases.get(normalized, "")
 
 
 def _action_label(action: str) -> str:
