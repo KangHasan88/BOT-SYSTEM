@@ -7,6 +7,7 @@ from trading_bot.storage.sqlite_store import (
     default_database_path,
     import_runtime_data,
     init_database,
+    load_candles_from_database,
     load_database_status,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "default_database_path",
     "import_runtime_data",
     "init_database",
+    "load_candles_from_database",
     "load_database_status",
 ]

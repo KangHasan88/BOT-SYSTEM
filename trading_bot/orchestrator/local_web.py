@@ -20,6 +20,7 @@ from trading_bot.storage import DatabaseStatus, load_database_status
 ACTIONS: dict[str, tuple[str, ...]] = {
     "validate_config": ("validate-config", "--config", "{config}"),
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
+    "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -195,6 +196,7 @@ def load_report_browser(config_path: str | Path = "config/bot.sample.toml") -> l
     reports.extend(_json_report_items(root / "validation" / "walk_forward", "Walk-Forward", "*.json"))
     reports.extend(_paper_report_items(root / "paper"))
     reports.extend(_json_report_items(root / "reports" / "daily", "Daily Journal", "*.json"))
+    reports.extend(_json_report_items(root / "reports" / "learning", "Learning", "*.json"))
     return sorted(reports, key=lambda item: item.updated_at_utc, reverse=True)
 
 
@@ -1057,6 +1059,7 @@ def _action_label(action: str) -> str:
     labels = {
         "validate_config": "Validasi Config",
         "import_runtime_db": "Import DB",
+        "db_learning_report": "Learning DB",
         "build_dashboard": "Buat Dashboard",
         "security_qa": "Security QA",
         "production_smoke": "Production Smoke",

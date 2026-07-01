@@ -51,6 +51,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 
 - Validasi Config;
 - Import DB SQLite lokal;
+- Learning DB dari SQLite lokal;
 - Buat Dashboard statis;
 - Security QA;
 - Production Smoke;
@@ -120,6 +121,9 @@ Ringkasan yang sama tersedia sebagai JSON di:
 ```text
 http://127.0.0.1:8000/api/database
 ```
+
+Tombol `Learning DB` membuat snapshot pembelajaran dari candle yang sudah masuk
+SQLite. Output-nya muncul di Browser Laporan sebagai kategori `Learning`.
 
 ## Kill Switch Dan Incident Panel
 

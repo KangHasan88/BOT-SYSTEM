@@ -25,6 +25,12 @@ Cek ringkasan database:
 & 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli db-status --config config/bot.sample.toml
 ```
 
+Buat learning snapshot dari database:
+
+```powershell
+& 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli db-learning-report --config config/bot.sample.toml
+```
+
 Default file database:
 
 ```text
@@ -37,6 +43,7 @@ work/market_data/bot.sqlite3
 - order, trade, dan account snapshot paper;
 - audit event dari `logs/audit.jsonl`;
 - aktivitas orchestrator dari `orchestrator/activity.jsonl`.
+- learning snapshot ke `reports/learning/database_snapshot.json`.
 
 Import bersifat idempotent. Jika command dijalankan berkali-kali, row yang sama
 tidak akan dobel.
@@ -47,6 +54,9 @@ dan tersedia via JSON di:
 ```text
 http://127.0.0.1:8000/api/database
 ```
+
+Di web orchestrator, urutan praktisnya: `Sinkron BTC/ETH`, `Import DB`, lalu
+`Learning DB`.
 
 ## Batasan V1
 

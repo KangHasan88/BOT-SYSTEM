@@ -42,6 +42,7 @@ Init/import database lokal:
 python -m trading_bot.cli init-db --config config/bot.sample.toml
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-status --config config/bot.sample.toml
+python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 ```
 
 ## Data Collection

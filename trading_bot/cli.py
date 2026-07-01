@@ -46,7 +46,12 @@ from trading_bot.reports.backtest import save_backtest_metrics_report
 from trading_bot.reports.daily_journal import generate_daily_market_journal, save_daily_market_journal
 from trading_bot.reports.quality import save_quality_report
 from trading_bot.reports.walk_forward import save_walk_forward_report
-from trading_bot.research import ResearchDatasetCsvStore, build_pattern_outcome_dataset
+from trading_bot.research import (
+    ResearchDatasetCsvStore,
+    build_pattern_outcome_dataset,
+    generate_database_learning_snapshot,
+    save_database_learning_snapshot,
+)
 from trading_bot.readiness import evaluate_live_readiness, save_live_readiness_report
 from trading_bot.scheduler import is_entry_allowed_at_ms
 from trading_bot.security import load_env_file, scan_for_secrets, validate_env_security
@@ -87,6 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
     db_status = subparsers.add_parser("db-status")
     db_status.add_argument("--config", default="config/bot.sample.toml")
     db_status.add_argument("--db-path")
+
+    db_learning = subparsers.add_parser("db-learning-report")
+    db_learning.add_argument("--config", default="config/bot.sample.toml")
+    db_learning.add_argument("--db-path")
+    db_learning.add_argument("--limit", type=int, default=500)
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -399,6 +409,29 @@ def main(argv: list[str] | None = None) -> int:
         for table in status.tables:
             print(f"table: {table.table} rows={table.rows}")
         return 0 if status.exists else 2
+
+    if args.command == "db-learning-report":
+        try:
+            config = load_config(Path(args.config))
+            db_path = Path(args.db_path) if args.db_path else default_database_path(config.data_root)
+            snapshot = generate_database_learning_snapshot(
+                db_path,
+                symbols=list(config.symbols),
+                timeframes=list(config.timeframes),
+                limit=args.limit,
+            )
+            path = save_database_learning_snapshot(snapshot, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"db learning report failed: {exc}")
+            return 2
+
+        print(
+            "db learning report ok: "
+            f"path={path}, rows={len(snapshot.rows)}, notes={len(snapshot.notes)}, db={snapshot.db_path}"
+        )
+        for note in snapshot.notes:
+            print(f"note: {note}")
+        return 0
 
     if args.command == "sync-ohlcv":
         try:

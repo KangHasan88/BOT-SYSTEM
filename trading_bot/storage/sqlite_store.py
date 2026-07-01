@@ -6,6 +6,8 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from trading_bot.data_collector.models import Candle
+
 
 @dataclass(frozen=True)
 class DatabaseImportSummary:
@@ -112,6 +114,49 @@ def load_database_status(data_root: str | Path, db_path: str | Path | None = Non
         updated_at_utc=_utc_from_timestamp(stat.st_mtime),
         tables=summaries,
     )
+
+
+def load_candles_from_database(
+    db_path: str | Path,
+    symbol: str = "",
+    timeframe: str = "",
+    limit: int = 500,
+) -> list[Candle]:
+    database = Path(db_path)
+    if not database.exists():
+        return []
+    clauses = []
+    params: list[object] = []
+    if symbol:
+        clauses.append("symbol = ?")
+        params.append(symbol)
+    if timeframe:
+        clauses.append("timeframe = ?")
+        params.append(timeframe)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    query = (
+        "SELECT symbol, timeframe, open_time_ms, open, high, low, close, volume, close_time_ms, source "
+        f"FROM market_candles {where} ORDER BY open_time_ms DESC LIMIT ?"
+    )
+    params.append(max(1, limit))
+    with sqlite3.connect(database) as connection:
+        rows = connection.execute(query, params).fetchall()
+    candles = [
+        Candle(
+            symbol=str(row[0]),
+            timeframe=str(row[1]),
+            open_time_ms=int(row[2]),
+            open=float(row[3]),
+            high=float(row[4]),
+            low=float(row[5]),
+            close=float(row[6]),
+            volume=float(row[7]),
+            close_time_ms=int(row[8]) if row[8] is not None else None,
+            source=str(row[9]),
+        )
+        for row in rows
+    ]
+    return sorted(candles, key=lambda candle: candle.open_time_ms)
 
 
 def _create_idempotency_indexes(connection: sqlite3.Connection) -> None:
