@@ -140,6 +140,16 @@ class LiveEvidencePanel:
     items: list[dict]
 
 
+@dataclass(frozen=True)
+class BeginnerStep:
+    number: int
+    title: str
+    status: str
+    plain_text: str
+    help_text: str
+    action_label: str
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -458,6 +468,7 @@ def build_orchestrator_page(
     database_html = _database_html(database)
     testnet_demo_html = _testnet_demo_html(testnet_demo)
     live_evidence_html = _live_evidence_html(live_evidence)
+    beginner_html = _beginner_control_room_html(status, health, live_evidence)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -505,6 +516,17 @@ def build_orchestrator_page(
     .metric {{ min-height: 86px; }}
     .metric span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 8px; }}
     .metric strong {{ display: block; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }}
+    .beginner-summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }}
+    .beginner-chip {{ border: 1px solid var(--soft-line); border-radius: 10px; padding: 11px; background: #f8fafc; min-height: 72px; }}
+    .beginner-chip span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 6px; }}
+    .beginner-chip strong {{ display: block; font-size: 16px; overflow-wrap: anywhere; }}
+    .step-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }}
+    .step-card {{ display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; border: 1px solid var(--soft-line); border-radius: 10px; padding: 12px; background: #fff; min-height: 132px; }}
+    .step-number {{ width: 30px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--primary-light); font-size: 13px; font-weight: 800; }}
+    .step-title {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 800; color: #334155; }}
+    .step-copy {{ color: #475569; font-size: 12px; line-height: 1.45; min-height: 34px; }}
+    .step-action {{ margin-top: 8px; color: var(--muted); font-size: 12px; font-weight: 700; }}
+    .help-dot {{ width: 20px; height: 20px; border-radius: 999px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: #475569; font-size: 12px; font-weight: 800; background: #f8fafc; flex: none; }}
     .badge {{ display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.35; }}
     .ok {{ background: #dcfce7; color: var(--good); }}
     .danger {{ background: #fee2e2; color: var(--bad); }}
@@ -554,6 +576,10 @@ def build_orchestrator_page(
       <div class="board-toolbar">
         <div class="toolbar-group">{action_buttons}</div>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Control Room Awam</h2>
+      <div>{beginner_html}</div>
     </section>
     <section class="grid">
       {_metric("Mode", status.mode)}
@@ -948,6 +974,148 @@ def _health_html(health: HealthSummary) -> str:
     )
 
 
+def _beginner_control_room_html(
+    status: OrchestratorStatus,
+    health: HealthSummary,
+    live_evidence: LiveEvidencePanel,
+) -> str:
+    overall_status, overall_css = _beginner_overall_status(status, health, live_evidence)
+    pnl_value = _paper_pnl_text(health.paper_reason)
+    evidence_text = (
+        f"{live_evidence.completion_pct:.2f}% siap"
+        if live_evidence.exists
+        else "belum ada evidence"
+    )
+    chips = (
+        '<div class="beginner-summary">'
+        + _beginner_chip("Kondisi Bot", overall_status, overall_css, "Ringkasan aman atau tidaknya bot saat ini.")
+        + _beginner_chip("Mode Akun", "Demo/Paper" if not status.live_enabled else "Live Aktif", "ok" if not status.live_enabled else "danger", "Mode uang asli harus tetap terkunci sampai owner approve.")
+        + _beginner_chip("P/L Demo", pnl_value, "ok" if not pnl_value.startswith("-") else "danger", "Profit/loss ini dari simulasi paper, bukan uang asli.")
+        + _beginner_chip("Evidence Live", evidence_text, "warn" if live_evidence.blocker_count else "ok", "Persentase bukti kesiapan sebelum live review.")
+        + "</div>"
+    )
+    steps = _beginner_steps(status, health, live_evidence)
+    return chips + '<div class="step-grid">' + "".join(_beginner_step_html(step) for step in steps) + "</div>"
+
+
+def _beginner_steps(
+    status: OrchestratorStatus,
+    health: HealthSummary,
+    live_evidence: LiveEvidencePanel,
+) -> list[BeginnerStep]:
+    safety_ok = not status.live_enabled and not status.kill_switch_active
+    data_ok = health.data_status == "OK"
+    paper_ok = health.paper_status == "ACTIVE"
+    evidence_ok = live_evidence.exists and live_evidence.blocker_count == 0
+    return [
+        BeginnerStep(
+            1,
+            "Cek Keamanan",
+            "Aman" if safety_ok else "Stop",
+            "Live masih terkunci dan kill switch clear." if safety_ok else "Ada safety lock yang perlu dicek.",
+            "Pastikan bot tidak bisa order live sebelum semua bukti dan owner approval lengkap.",
+            "Validasi Config",
+        ),
+        BeginnerStep(
+            2,
+            "Cek Data Market",
+            "Aman" if data_ok else "Perlu Data",
+            "Data candle bisa dipakai." if data_ok else "Data belum cukup atau ada blocker.",
+            "Kalau data bolong, analisa bot tidak dipercaya untuk backtest atau paper.",
+            "Evidence Campaign",
+        ),
+        BeginnerStep(
+            3,
+            "Cek Sinyal",
+            "Pantau",
+            "Bot membaca kondisi market dan sinyal konservatif.",
+            "Sinyal bukan perintah live. Ini hanya kandidat yang harus lolos risiko dan paper.",
+            "Jalankan Siklus",
+        ),
+        BeginnerStep(
+            4,
+            "Cek Risiko",
+            "Aman" if health.safety_status == "SAFE" else "Stop",
+            "Risk guard tidak melihat bahaya aktif." if health.safety_status == "SAFE" else "Risk guard meminta perhatian.",
+            "Bot mengecek batas rugi, profit lock, kill switch, dan batas posisi.",
+            "Risk / Security QA",
+        ),
+        BeginnerStep(
+            5,
+            "Demo Trade",
+            "Aktif" if paper_ok else "Belum Ada",
+            "Paper trade sudah punya aktivitas." if paper_ok else "Belum ada simulasi trade yang cukup.",
+            "Demo trade memakai saldo virtual, bukan uang asli.",
+            "Demo Data / Testnet Demo",
+        ),
+        BeginnerStep(
+            6,
+            "Pantau P/L",
+            "Aktif" if paper_ok else "Menunggu",
+            f"P/L demo sekarang { _paper_pnl_text(health.paper_reason) }.",
+            "P/L ini dari trade paper. Detail chart akan masuk ke P/L Visual Monitor.",
+            "Lihat Paper Reports",
+        ),
+        BeginnerStep(
+            7,
+            "Review Go Live",
+            "Belum Siap" if not evidence_ok else "Siap Review",
+            f"{live_evidence.blocker_count} blocker aktif." if live_evidence.exists else "Evidence belum dibuat.",
+            "Real live baru boleh dibahas setelah paper, QA, testnet, dan owner approval lengkap.",
+            "Live Evidence",
+        ),
+    ]
+
+
+def _beginner_chip(label: str, value: str, css: str, help_text: str) -> str:
+    return (
+        f'<div class="beginner-chip" title="{escape(help_text)}">'
+        f"<span>{escape(label)}</span>"
+        f'<strong><span class="badge {css}">{escape(value)}</span></strong>'
+        "</div>"
+    )
+
+
+def _beginner_step_html(step: BeginnerStep) -> str:
+    css = _plain_status_class(step.status)
+    return (
+        f'<div class="step-card" title="{escape(step.help_text)}">'
+        f'<div class="step-number">{step.number}</div>'
+        "<div>"
+        f'<div class="step-title"><span>{escape(step.title)}</span><span class="help-dot" title="{escape(step.help_text)}">?</span></div>'
+        f'<span class="badge {css}">{escape(step.status)}</span>'
+        f'<div class="step-copy">{escape(step.plain_text)}</div>'
+        f'<div class="step-action">{escape(step.action_label)}</div>'
+        "</div>"
+        "</div>"
+    )
+
+
+def _beginner_overall_status(
+    status: OrchestratorStatus,
+    health: HealthSummary,
+    live_evidence: LiveEvidencePanel,
+) -> tuple[str, str]:
+    if status.live_enabled or status.kill_switch_active or health.safety_status == "BLOCKED":
+        return "Stop / Cek Dulu", "danger"
+    if health.data_status in {"BLOCKED", "MISSING"} or not live_evidence.exists:
+        return "Perlu Data", "warn"
+    if live_evidence.blocker_count:
+        return "Demo Aman", "warn"
+    return "Siap Review", "ok"
+
+
+def _paper_pnl_text(reason: str) -> str:
+    marker = "net_pnl="
+    if marker not in reason:
+        return "0.00000000"
+    value = reason.split(marker, 1)[1].split(",", 1)[0].strip()
+    try:
+        return f"{float(value):.8f}"
+    except ValueError:
+        return value or "0.00000000"
+
+
 def _health_card(label: str, status: str, reason: str) -> str:
     css = "danger" if status in {"BLOCKED", "NO_GO"} else "warn" if status in {"MISSING", "NO_TRADES"} else "ok"
     return (
@@ -1244,6 +1412,15 @@ def _report_status_class(status: str) -> str:
     if normalized in {"REJECT", "NO_GO", "BLOCKED", "FAILED", "REVIEW_REQUIRED", "INVALID"}:
         return "danger"
     if normalized in {"NOT_ENOUGH_DATA", "NEEDS_FILTER", "NO_DATA", "EMPTY", "MISSING"}:
+        return "warn"
+    return "ok"
+
+
+def _plain_status_class(status: str) -> str:
+    normalized = status.lower()
+    if normalized in {"stop", "belum siap", "stop / cek dulu"}:
+        return "danger"
+    if normalized in {"perlu data", "pantau", "belum ada", "menunggu", "demo aman"}:
         return "warn"
     return "ok"
 

@@ -80,6 +80,23 @@ Halaman utama merangkum:
 
 Status bahaya seperti `BLOCKED` dan `NO_GO` ditampilkan sebagai badge yang jelas.
 
+## Control Room Awam
+
+Panel `Control Room Awam` adalah tampilan pertama untuk user non-teknis. Panel
+ini menampilkan ringkasan kondisi bot, mode akun, P/L demo, evidence live, dan
+7 step bernomor:
+
+- Cek Keamanan;
+- Cek Data Market;
+- Cek Sinyal;
+- Cek Risiko;
+- Demo Trade;
+- Pantau P/L;
+- Review Go Live.
+
+Setiap step punya hover message agar user paham arti status tanpa membuka file
+teknis. Panel ini tetap read-only dan tidak menyediakan tombol real live order.
+
 ## Setup Cepat
 
 Halaman utama punya checklist first-run untuk:
