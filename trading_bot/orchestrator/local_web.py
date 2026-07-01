@@ -151,6 +151,16 @@ class BeginnerStep:
 
 
 @dataclass(frozen=True)
+class DemoWalkthroughStep:
+    number: int
+    title: str
+    status: str
+    goal: str
+    action_label: str
+    help_text: str
+
+
+@dataclass(frozen=True)
 class PnlTradeRow:
     symbol: str
     timeframe: str
@@ -367,6 +377,66 @@ def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPan
     )
 
 
+def load_demo_walkthrough(config_path: str | Path = "config/bot.sample.toml") -> list[DemoWalkthroughStep]:
+    setup = {check.name: check for check in load_setup_wizard(config_path)}
+    status = load_orchestrator_status(config_path)
+    pnl = load_pnl_panel(config_path)
+    live_evidence = load_live_evidence_panel(config_path)
+    config = load_config(Path(config_path))
+    campaign_path = Path(config.data_root) / "readiness" / "evidence_campaign.json"
+
+    return [
+        DemoWalkthroughStep(
+            1,
+            "Buka Web Lokal",
+            "PASS",
+            "Pastikan halaman ini bisa dibuka di browser.",
+            "Buka 127.0.0.1:8000",
+            "Kalau browser refused, jalankan start-bot-web.cmd dari root project.",
+        ),
+        DemoWalkthroughStep(
+            2,
+            "Cek Config",
+            _walkthrough_status(setup.get("Config")),
+            "Pastikan bot membaca config yang benar dan live tetap nonaktif.",
+            "Klik Validasi Config",
+            "Langkah ini belum trading. Ini hanya cek file config dan mode aman.",
+        ),
+        DemoWalkthroughStep(
+            3,
+            "Isi Data Demo",
+            _walkthrough_status(setup.get("Demo Data")),
+            "Siapkan candle, paper trade, dan laporan contoh agar panel tidak kosong.",
+            "Klik Demo Data",
+            "Data demo dipakai untuk belajar UI dan QA, bukan data real live account.",
+        ),
+        DemoWalkthroughStep(
+            4,
+            "Jalankan Evidence",
+            "PASS" if campaign_path.exists() else "TODO",
+            "Refresh bukti data quality, backtest, paper, readiness, dan live evidence.",
+            "Klik Evidence Campaign",
+            "Kalau status masih incomplete, itu normal sampai bukti paper cukup.",
+        ),
+        DemoWalkthroughStep(
+            5,
+            "Pantau P/L",
+            "PASS" if pnl.trade_count > 0 else "TODO",
+            "Lihat realized P/L demo, win rate, equity curve, dan trade terakhir.",
+            "Lihat P/L Visual Monitor",
+            "P/L di sini dari paper/demo. Warna hijau/merah membantu membaca hasil.",
+        ),
+        DemoWalkthroughStep(
+            6,
+            "Review Go Live",
+            "PASS" if live_evidence.exists and live_evidence.status in {"READY", "READY_FOR_MANUAL_REVIEW"} else "TODO",
+            "Baca blocker sebelum membahas live kecil dengan modal real.",
+            "Klik Live Evidence",
+            f"Mode sekarang {status.mode}. Real live tetap terkunci sampai owner approval dan semua gate lulus.",
+        ),
+    ]
+
+
 def update_kill_switch_from_web(
     action: str,
     reason: str,
@@ -499,6 +569,7 @@ def build_orchestrator_page(
     testnet_demo: TestnetDemoPanel | None = None,
     live_evidence: LiveEvidencePanel | None = None,
     pnl: PnlPanel | None = None,
+    walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
@@ -510,6 +581,7 @@ def build_orchestrator_page(
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
+    walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -522,6 +594,7 @@ def build_orchestrator_page(
     live_evidence_html = _live_evidence_html(live_evidence)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
+    walkthrough_html = _demo_walkthrough_html(walkthrough)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -587,6 +660,13 @@ def build_orchestrator_page(
     .pnl-fill {{ fill: rgba(18, 59, 122, 0.10); }}
     .pnl-zero {{ stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 4 4; }}
     .pnl-table-wrap {{ overflow-x: auto; }}
+    .walkthrough {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }}
+    .walk-step {{ min-height: 172px; border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }}
+    .walk-head {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
+    .walk-title {{ display: flex; align-items: center; gap: 8px; min-width: 0; }}
+    .walk-number {{ width: 28px; height: 28px; border-radius: 999px; background: var(--focus); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none; }}
+    .walk-goal {{ color: #475569; font-size: 13px; line-height: 1.45; flex: 1; }}
+    .walk-action {{ color: var(--muted); font-size: 12px; font-weight: 800; }}
     .badge {{ display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.35; }}
     .ok {{ background: #dcfce7; color: var(--good); }}
     .danger {{ background: #fee2e2; color: var(--bad); }}
@@ -615,6 +695,7 @@ def build_orchestrator_page(
       .board-title {{ align-items: flex-start; }}
       .toolbar-group {{ width: 100%; }}
       .pnl-layout {{ grid-template-columns: 1fr; }}
+      .walkthrough {{ grid-template-columns: 1fr; }}
       .data-table {{ display: block; overflow-x: auto; }}
     }}
   </style>
@@ -641,6 +722,11 @@ def build_orchestrator_page(
     <section class="panel">
       <h2>Control Room Awam</h2>
       <div>{beginner_html}</div>
+    </section>
+    <section class="panel">
+      <h2>Demo Walkthrough</h2>
+      <div>{walkthrough_html}</div>
+      <p class="small">Ikuti urutan ini untuk demo lokal yang aman. Semua langkah tetap paper/demo dan read-only untuk live.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -821,6 +907,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
+                if parsed.path == "/api/walkthrough":
+                    self._json_response([asdict(step) for step in load_demo_walkthrough(config_path)])
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -851,6 +940,7 @@ def _handler_factory(config_path: Path):
                 testnet_demo = load_testnet_demo_panel(config_path)
                 live_evidence = load_live_evidence_panel(config_path)
                 pnl = load_pnl_panel(config_path)
+                walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
                     build_orchestrator_page(
                         status,
@@ -864,6 +954,7 @@ def _handler_factory(config_path: Path):
                         testnet_demo,
                         live_evidence,
                         pnl,
+                        walkthrough,
                     )
                 )
             except (ConfigError, ValueError, OSError) as exc:
@@ -1227,6 +1318,36 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         "<thead><tr><th>Waktu Exit</th><th>Symbol</th><th>TF</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Alasan Exit</th></tr></thead>"
         f"<tbody>{trade_rows}</tbody></table></div>"
     )
+
+
+def _demo_walkthrough_html(steps: list[DemoWalkthroughStep]) -> str:
+    if not steps:
+        return '<p class="small">Walkthrough belum tersedia.</p>'
+    cards = []
+    for step in steps:
+        css = _report_status_class(step.status)
+        cards.append(
+            '<div class="walk-step" title="'
+            + escape(step.help_text)
+            + '">'
+            + '<div class="walk-head">'
+            + '<div class="walk-title">'
+            + f'<span class="walk-number">{step.number}</span>'
+            + f"<strong>{escape(step.title)}</strong>"
+            + "</div>"
+            + f'<span class="badge {css}">{escape(step.status)}</span>'
+            + "</div>"
+            + f'<div class="walk-goal">{escape(step.goal)}</div>'
+            + f'<div class="walk-action">{escape(step.action_label)}</div>'
+            + "</div>"
+        )
+    return '<div class="walkthrough">' + "".join(cards) + "</div>"
+
+
+def _walkthrough_status(check: SetupCheck | None) -> str:
+    if check is None:
+        return "TODO"
+    return "PASS" if check.status == "PASS" else "TODO"
 
 
 def _equity_svg(points: list[float]) -> str:

@@ -8,12 +8,14 @@ from pathlib import Path
 from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
+    DemoWalkthroughStep,
     LiveEvidencePanel,
     PnlPanel,
     PnlTradeRow,
     TestnetDemoPanel,
     build_orchestrator_page,
     load_database_panel,
+    load_demo_walkthrough,
     load_health_summary,
     load_incident_panel,
     load_live_evidence_panel,
@@ -50,6 +52,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Limit candle", html)
         self.assertIn("Buat Dashboard", html)
         self.assertIn("Control Room Awam", html)
+        self.assertIn("Demo Walkthrough", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -257,6 +260,35 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Equity curve demo", html)
         self.assertIn("BTC/USDT", html)
         self.assertIn("SESSION_END", html)
+
+    def test_demo_walkthrough_renders_numbered_beginner_steps(self) -> None:
+        walkthrough = [
+            DemoWalkthroughStep(1, "Buka Web Lokal", "PASS", "Buka halaman browser.", "Buka 127.0.0.1:8000", "Jika refused, start server."),
+            DemoWalkthroughStep(2, "Cek Config", "TODO", "Pastikan config aman.", "Klik Validasi Config", "Ini belum trading."),
+        ]
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, walkthrough=walkthrough)
+
+        self.assertIn("Demo Walkthrough", html)
+        self.assertIn("Buka Web Lokal", html)
+        self.assertIn("Klik Validasi Config", html)
+        self.assertIn("Ikuti urutan ini", html)
+
+    def test_demo_walkthrough_loader_reports_safe_demo_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+
+            steps = load_demo_walkthrough(config_path)
+
+        self.assertEqual(6, len(steps))
+        self.assertEqual("Buka Web Lokal", steps[0].title)
+        self.assertEqual("PASS", steps[0].status)
+        self.assertIn("Evidence", steps[3].title)
+        self.assertIn("Real live tetap terkunci", steps[-1].help_text)
 
     def test_pnl_panel_loader_reads_paper_csv(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

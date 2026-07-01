@@ -97,6 +97,25 @@ ini menampilkan ringkasan kondisi bot, mode akun, P/L demo, evidence live, dan
 Setiap step punya hover message agar user paham arti status tanpa membuka file
 teknis. Panel ini tetap read-only dan tidak menyediakan tombol real live order.
 
+## Demo Walkthrough
+
+Panel `Demo Walkthrough` adalah jalur demo lokal 1-6:
+
+- buka web lokal;
+- cek config;
+- isi data demo;
+- jalankan evidence campaign;
+- pantau P/L;
+- review go-live blocker.
+
+Setiap kartu punya nomor urut, status, aksi yang perlu diklik, dan hover message
+bahasa awam. Jalur ini membantu user menjalankan demo lokal tanpa membuka file
+teknis satu per satu. Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/walkthrough
+```
+
 ## P/L Visual Monitor
 
 Panel `P/L Visual Monitor` membaca hasil paper/demo dari file `account.csv` dan

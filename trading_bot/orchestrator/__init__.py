@@ -3,6 +3,7 @@
 from trading_bot.orchestrator.local_web import (
     ACTIONS,
     DatabasePanel,
+    DemoWalkthroughStep,
     HealthSummary,
     IncidentPanel,
     LiveEvidencePanel,
@@ -15,6 +16,7 @@ from trading_bot.orchestrator.local_web import (
     TestnetDemoPanel,
     build_orchestrator_page,
     load_database_panel,
+    load_demo_walkthrough,
     load_health_summary,
     load_incident_panel,
     load_live_evidence_panel,
@@ -32,6 +34,7 @@ from trading_bot.orchestrator.local_web import (
 __all__ = [
     "ACTIONS",
     "DatabasePanel",
+    "DemoWalkthroughStep",
     "HealthSummary",
     "IncidentPanel",
     "LiveEvidencePanel",
@@ -44,6 +47,7 @@ __all__ = [
     "TestnetDemoPanel",
     "build_orchestrator_page",
     "load_database_panel",
+    "load_demo_walkthrough",
     "load_health_summary",
     "load_incident_panel",
     "load_live_evidence_panel",
