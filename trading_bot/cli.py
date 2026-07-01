@@ -12,6 +12,7 @@ from trading_bot.data_collector.binance_public import BinancePublicKlineClient
 from trading_bot.data_collector.context_store import MarketContextCsvStore
 from trading_bot.data_collector.csv_store import CandleCsvStore
 from trading_bot.data_collector.service import MarketDataCollector
+from trading_bot.demo import seed_demo_data_pack
 from trading_bot.execution import ExchangeOrderRequest, SandboxExchangeAdapter
 from trading_bot.feature_engine import FeatureCsvStore, RegimeCsvStore, build_features, classify_regimes
 from trading_bot.live import LivePhaseOneConfig, build_live_phase_one_plan
@@ -97,6 +98,11 @@ def build_parser() -> argparse.ArgumentParser:
     db_learning.add_argument("--config", default="config/bot.sample.toml")
     db_learning.add_argument("--db-path")
     db_learning.add_argument("--limit", type=int, default=500)
+
+    demo_data = subparsers.add_parser("seed-demo-data")
+    demo_data.add_argument("--config", default="config/bot.sample.toml")
+    demo_data.add_argument("--candles-per-pair", type=int, default=180)
+    demo_data.add_argument("--initial-equity", type=float, default=1_000.0)
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -431,6 +437,26 @@ def main(argv: list[str] | None = None) -> int:
         )
         for note in snapshot.notes:
             print(f"note: {note}")
+        return 0
+
+    if args.command == "seed-demo-data":
+        try:
+            config = load_config(Path(args.config))
+            result = seed_demo_data_pack(
+                config,
+                candles_per_pair=args.candles_per_pair,
+                initial_equity=args.initial_equity,
+            )
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"seed demo data failed: {exc}")
+            return 2
+
+        print(
+            "seed demo data ok: "
+            f"candles={result.candle_rows}, cycle_candles={result.cycle_candles_seen}, "
+            f"paper_trades={result.paper_trades}, db_rows={result.database_rows}, "
+            f"learning={result.learning_report_path}, dashboard={result.dashboard_path}"
+        )
         return 0
 
     if args.command == "sync-ohlcv":

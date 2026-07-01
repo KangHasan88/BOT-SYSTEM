@@ -32,6 +32,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("board-header", html)
         self.assertIn("toolbar-group", html)
         self.assertIn("data-table", html)
+        self.assertIn("Demo Data", html)
         self.assertIn("Jalankan Siklus", html)
         self.assertIn("Sinkron BTC 15m", html)
         self.assertIn("Import DB", html)
@@ -68,6 +69,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Config", by_name)
         self.assertIn("Live Guard", by_name)
         self.assertIn("Data Root", by_name)
+        self.assertIn("Demo Data", by_name)
         self.assertIn("Security QA", by_name)
         self.assertIn("Dashboard", by_name)
         self.assertIn("Database", by_name)
@@ -144,6 +146,7 @@ class OrchestratorTest(unittest.TestCase):
 
     def test_action_registry_has_only_safe_commands(self) -> None:
         self.assertIn("run_cycle", ACTIONS)
+        self.assertIn("seed_demo_data", ACTIONS)
         self.assertIn("import_runtime_db", ACTIONS)
         self.assertIn("db_learning_report", ACTIONS)
         self.assertIn("sync_btc_15m", ACTIONS)

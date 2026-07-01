@@ -19,6 +19,7 @@ from trading_bot.storage import DatabaseStatus, load_database_status
 
 ACTIONS: dict[str, tuple[str, ...]] = {
     "validate_config": ("validate-config", "--config", "{config}"),
+    "seed_demo_data": ("seed-demo-data", "--config", "{config}", "--candles-per-pair", "{limit}"),
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
@@ -148,7 +149,15 @@ def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> lis
                 "Data Root",
                 "PASS" if root.exists() else "TODO",
                 str(root),
-                "Klik Jalankan Siklus atau Sinkron untuk membuat data",
+                "Klik Demo Data atau Sinkron untuk membuat data",
+            )
+        )
+        checks.append(
+            SetupCheck(
+                "Demo Data",
+                "PASS" if list(root.glob("*/*.csv")) else "TODO",
+                "sample candle tersedia" if list(root.glob("*/*.csv")) else "belum ada sample candle",
+                "Klik Demo Data",
             )
         )
         checks.append(
@@ -485,7 +494,7 @@ def build_orchestrator_page(
     <section class="panel">
       <h2>Setup Cepat</h2>
       <div>{setup_html}</div>
-      <p class="small">Urutan awal yang disarankan: Validasi Config, Security QA, Buat Dashboard, lalu Jalankan Siklus.</p>
+      <p class="small">Urutan awal yang disarankan: Validasi Config, Demo Data, Import DB, Learning DB, Security QA, lalu Buat Dashboard.</p>
     </section>
     <section class="panel">
       <h2>Browser Laporan</h2>
@@ -755,6 +764,8 @@ def _action_button(action: str, disabled: bool) -> str:
 def _action_icon(action: str) -> str:
     if "sync" in action:
         return _svg_icon("refresh")
+    if "demo" in action:
+        return _svg_icon("database")
     if "security" in action or "go_no_go" in action or "incident" in action:
         return _svg_icon("shield")
     if "dashboard" in action:
@@ -1058,6 +1069,7 @@ def _context_summary(context: dict) -> str:
 def _action_label(action: str) -> str:
     labels = {
         "validate_config": "Validasi Config",
+        "seed_demo_data": "Demo Data",
         "import_runtime_db": "Import DB",
         "db_learning_report": "Learning DB",
         "build_dashboard": "Buat Dashboard",

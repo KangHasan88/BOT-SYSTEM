@@ -50,6 +50,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 ## Aksi Aman
 
 - Validasi Config;
+- Demo Data lokal tanpa exchange/live;
 - Import DB SQLite lokal;
 - Learning DB dari SQLite lokal;
 - Buat Dashboard statis;
@@ -84,6 +85,7 @@ Halaman utama punya checklist first-run untuk:
 - validitas config;
 - live guard nonaktif;
 - ketersediaan root data market;
+- sample candle demo;
 - report Security QA;
 - dashboard yang sudah dibuat;
 - database SQLite lokal;
@@ -124,6 +126,9 @@ http://127.0.0.1:8000/api/database
 
 Tombol `Learning DB` membuat snapshot pembelajaran dari candle yang sudah masuk
 SQLite. Output-nya muncul di Browser Laporan sebagai kategori `Learning`.
+
+Untuk demo akun pertama, gunakan `Demo Data` dan paper/sandbox dulu. Ini membuat
+bot bisa dipakai end-to-end tanpa real-money live key.
 
 ## Kill Switch Dan Incident Panel
 

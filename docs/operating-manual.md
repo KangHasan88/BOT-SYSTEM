@@ -39,6 +39,7 @@ python -m trading_bot.cli build-dashboard
 Init/import database lokal:
 
 ```bash
+python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
 python -m trading_bot.cli init-db --config config/bot.sample.toml
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-status --config config/bot.sample.toml

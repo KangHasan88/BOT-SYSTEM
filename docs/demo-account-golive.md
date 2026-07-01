@@ -1,0 +1,31 @@
+# Demo Account Go-Live Path
+
+Target terdekat adalah bot bisa dipakai end-to-end dengan demo account, bukan
+real-money live account.
+
+## Tahap Aman
+
+1. Local demo data: jalankan `Demo Data` di web orchestrator.
+2. Paper mode: bot membuat order/trade/account snapshot virtual.
+3. SQLite archive: klik `Import DB`.
+4. Learning snapshot: klik `Learning DB`.
+5. Sandbox/testnet: gunakan adapter `sandbox` atau `testnet`, tanpa withdrawal.
+6. Live review: hanya setelah paper evidence, security QA, readiness, dan manual
+   owner approval lulus.
+
+## Command Lokal
+
+```bash
+python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
+python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
+python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
+python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
+```
+
+## Guard
+
+- Real live key tidak dibutuhkan untuk demo account.
+- `BOT_LIVE_ENABLED=false` wajib tetap aktif.
+- Tidak ada tombol live buy/sell/order di UI lokal.
+- Testnet/sandbox boleh untuk uji execution flow, tapi tidak menjadi izin real
+  live otomatis.
