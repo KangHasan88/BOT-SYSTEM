@@ -10,6 +10,7 @@ Live trading tetap disabled.
 - Env: `/etc/trading-bot/trading-bot.env`
 - Data: `/var/lib/trading-bot/data`
 - Logs: journalctl unit `trading-bot-cycle.service`
+- Private web: `trading-bot-orchestrator.service` bound to `127.0.0.1:8000`
 
 ## Install Outline
 
@@ -20,6 +21,7 @@ sudo chown -R tradingbot:tradingbot /opt/trading-bot /var/lib/trading-bot /var/l
 sudo cp config/bot.vps.sample.toml /etc/trading-bot/bot.toml
 sudo cp deploy/trading-bot.env.example /etc/trading-bot/trading-bot.env
 sudo cp deploy/systemd/trading-bot-cycle.* /etc/systemd/system/
+sudo cp deploy/systemd/trading-bot-orchestrator.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now trading-bot-cycle.timer
 ```
@@ -32,6 +34,13 @@ python -m trading_bot.cli vps-readiness-report --config config/bot.vps.sample.to
 systemctl status trading-bot-cycle.timer
 journalctl -u trading-bot-cycle.service -n 80 --no-pager
 ```
+
+## Private Web Demo
+
+Read: `docs/private-vps-demo-access.md`
+
+The VPS web orchestrator must bind to `127.0.0.1:8000` and be accessed from the
+laptop via SSH tunnel or VPN. Do not expose this dashboard as a public website.
 
 ## Safety Gates
 

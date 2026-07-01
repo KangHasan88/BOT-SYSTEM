@@ -156,6 +156,7 @@ lock, and kill switch behavior without touching the real kill switch state.
 ## VPS
 
 Read: `docs/vps-deployment.md`
+Private VPS demo access: `docs/private-vps-demo-access.md`
 
 Smoke:
 
@@ -170,6 +171,12 @@ Systemd:
 ```bash
 systemctl status trading-bot-cycle.timer
 journalctl -u trading-bot-cycle.service -n 80 --no-pager
+```
+
+Private web tunnel from laptop:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-vps-demo-tunnel.ps1 -SshUser tradingbot -SshHost 31.97.106.123 -LocalPort 18000 -RemotePort 8000
 ```
 
 ## Security

@@ -61,6 +61,7 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | Execution sandbox | `tests/test_execution_sandbox_unittest.py` | unit | Sandbox/testnet only, reject live environment |
 | VPS deployment | `tests/test_vps_deployment_unittest.py` | static QA | Service uses non-root user and live remains disabled |
 | VPS readiness | `tests/test_vps_readiness_unittest.py` | static QA | Gate service hardening, timer behavior, smoke script, monitoring |
+| Private VPS demo access | `tests/test_private_vps_access_unittest.py` | static QA | Web orchestrator binds to localhost and uses SSH tunnel only |
 | Production smoke | `tests/test_production_smoke_unittest.py` | static QA | Gate smoke script, rollback plan, QA evidence reports |
 | Scheduler | `tests/test_scheduler_unittest.py` | unit | Enforce WIB entry windows |
 | Security | `tests/test_security_unittest.py` | unit | Reject withdrawal permission, live mode, leaked secret |
