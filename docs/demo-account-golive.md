@@ -5,7 +5,7 @@ real-money live account.
 
 ## Tahap Aman
 
-1. Local demo data: jalankan `Demo Data` di web orchestrator.
+1. Local demo data: jalankan `Demo Data` atau `Local Demo` di web orchestrator.
 2. Paper mode: bot membuat order/trade/account snapshot virtual.
 3. SQLite archive: klik `Import DB`.
 4. Learning snapshot: klik `Learning DB`.
@@ -17,6 +17,7 @@ real-money live account.
 
 ```bash
 python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
+python -m trading_bot.cli local-demo-report --config config/bot.sample.toml --seed-demo-if-needed
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 python -m trading_bot.cli testnet-demo-report --config config/bot.sample.toml --environment testnet
@@ -31,11 +32,18 @@ python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT 
 work/market_data/execution/testnet_demo/report.json
 ```
 
+`local-demo-report` membuat laporan kesiapan demo lokal di:
+
+```text
+work/market_data/demo/local_demo.json
+```
+
 Di web orchestrator, report yang sama tampil di panel `Demo/Testnet Monitoring`
 dan API read-only:
 
 ```text
 http://127.0.0.1:8000/api/testnet-demo
+http://127.0.0.1:8000/api/local-demo
 ```
 
 `live-evidence-report` membuat checklist evidence di:

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from trading_bot.config import load_config
-from trading_bot.demo import seed_demo_data_pack
+from trading_bot.demo import build_local_demo_report, save_local_demo_report, seed_demo_data_pack
 from trading_bot.storage import load_database_status
 
 
@@ -37,6 +37,25 @@ class DemoDataPackTest(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 seed_demo_data_pack(config, candles_per_pair=20)
+
+    def test_local_demo_report_can_seed_and_verify_safe_path(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+            config = load_config(config_path)
+
+            report = build_local_demo_report(config, seed_demo_if_needed=True, candles_per_pair=180)
+            path = save_local_demo_report(report, config.data_root)
+            path_exists = path.exists()
+
+        self.assertTrue(path_exists)
+        self.assertTrue(report.seeded_demo_data)
+        self.assertTrue(report.live_locked)
+        self.assertGreater(report.candle_rows, 0)
+        self.assertGreater(report.paper_trades, 0)
+        self.assertEqual("READY_FOR_LOCAL_DEMO", report.status)
+        self.assertTrue(any(check.name == "pnl_monitor" for check in report.checks))
 
 
 def _write_config(path: Path, data_root: Path) -> None:

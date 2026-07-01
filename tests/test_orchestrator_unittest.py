@@ -10,6 +10,7 @@ from trading_bot.orchestrator import (
     DatabasePanel,
     DemoWalkthroughStep,
     LiveEvidencePanel,
+    LocalDemoPanel,
     PnlPanel,
     PnlTradeRow,
     TestnetDemoPanel,
@@ -19,6 +20,7 @@ from trading_bot.orchestrator import (
     load_health_summary,
     load_incident_panel,
     load_live_evidence_panel,
+    load_local_demo_panel,
     load_orchestrator_status,
     load_pnl_panel,
     load_report_browser,
@@ -53,6 +55,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Buat Dashboard", html)
         self.assertIn("Control Room Awam", html)
         self.assertIn("Demo Walkthrough", html)
+        self.assertIn("Local Demo Readiness", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -289,6 +292,61 @@ class OrchestratorTest(unittest.TestCase):
         self.assertEqual("PASS", steps[0].status)
         self.assertIn("Evidence", steps[3].title)
         self.assertIn("Real live tetap terkunci", steps[-1].help_text)
+
+    def test_local_demo_panel_renders_readiness_summary(self) -> None:
+        panel = LocalDemoPanel(
+            report_path="work/market_data/demo/local_demo.json",
+            exists=True,
+            status="READY_FOR_LOCAL_DEMO",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            candle_rows=180,
+            paper_trades=4,
+            report_count=8,
+            live_locked=True,
+            summary="local paper/demo path is ready",
+            checks=[
+                {
+                    "name": "pnl_monitor",
+                    "status": "PASS",
+                    "reason": "P/L Visual Monitor has paper trades",
+                    "next_action": "Lihat panel P/L Visual Monitor",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, local_demo=panel)
+
+        self.assertIn("Local Demo Readiness", html)
+        self.assertIn("READY_FOR_LOCAL_DEMO", html)
+        self.assertIn("LOCKED", html)
+        self.assertIn("pnl_monitor", html)
+
+    def test_local_demo_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "demo" / "local_demo.json",
+                {
+                    "status": "READY_FOR_LOCAL_DEMO",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "candle_rows": 90,
+                    "paper_trades": 2,
+                    "report_count": 5,
+                    "live_locked": True,
+                    "summary": "ready",
+                    "checks": [{"name": "config_safe", "status": "PASS"}],
+                },
+            )
+
+            panel = load_local_demo_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("READY_FOR_LOCAL_DEMO", panel.status)
+        self.assertEqual(2, panel.paper_trades)
 
     def test_pnl_panel_loader_reads_paper_csv(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

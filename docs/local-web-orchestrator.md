@@ -51,6 +51,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 
 - Validasi Config;
 - Demo Data lokal tanpa exchange/live;
+- Local Demo readiness untuk cek jalur demo end-to-end;
 - Import DB SQLite lokal;
 - Learning DB dari SQLite lokal;
 - Buat Dashboard statis;
@@ -114,6 +115,30 @@ teknis satu per satu. Status yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/walkthrough
+```
+
+## Local Demo Readiness
+
+Panel `Local Demo Readiness` membaca report end-to-end demo lokal dari:
+
+```text
+work/market_data/demo/local_demo.json
+```
+
+Klik tombol `Local Demo` untuk membuat report ini. Jika data demo belum ada,
+aksi ini boleh mengisi data demo terlebih dahulu, lalu memeriksa:
+
+- web lokal;
+- config safe dan live lock;
+- candle demo;
+- paper trades;
+- report JSON;
+- P/L Visual Monitor.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/local-demo
 ```
 
 ## P/L Visual Monitor

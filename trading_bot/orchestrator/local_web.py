@@ -20,6 +20,7 @@ from trading_bot.storage import DatabaseStatus, load_database_status
 ACTIONS: dict[str, tuple[str, ...]] = {
     "validate_config": ("validate-config", "--config", "{config}"),
     "seed_demo_data": ("seed-demo-data", "--config", "{config}", "--candles-per-pair", "{limit}"),
+    "local_demo": ("local-demo-report", "--config", "{config}", "--seed-demo-if-needed"),
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
@@ -138,6 +139,20 @@ class LiveEvidencePanel:
     summary: str
     blockers: list[str]
     items: list[dict]
+
+
+@dataclass(frozen=True)
+class LocalDemoPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    candle_rows: int
+    paper_trades: int
+    report_count: int
+    live_locked: bool
+    summary: str
+    checks: list[dict]
 
 
 @dataclass(frozen=True)
@@ -349,6 +364,24 @@ def load_live_evidence_panel(config_path: str | Path = "config/bot.sample.toml")
         summary=str(payload.get("summary", "")),
         blockers=blockers if isinstance(blockers, list) else [],
         items=items if isinstance(items, list) else [],
+    )
+
+
+def load_local_demo_panel(config_path: str | Path = "config/bot.sample.toml") -> LocalDemoPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "demo" / "local_demo.json"
+    payload = _read_json(path) or {}
+    return LocalDemoPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        candle_rows=int(payload.get("candle_rows", 0) or 0),
+        paper_trades=int(payload.get("paper_trades", 0) or 0),
+        report_count=int(payload.get("report_count", 0) or 0),
+        live_locked=bool(payload.get("live_locked", False)),
+        summary=str(payload.get("summary", "Klik Local Demo untuk membuat report demo lokal.")),
+        checks=list(payload.get("checks", [])) if isinstance(payload.get("checks", []), list) else [],
     )
 
 
@@ -568,6 +601,7 @@ def build_orchestrator_page(
     database: DatabasePanel | None = None,
     testnet_demo: TestnetDemoPanel | None = None,
     live_evidence: LiveEvidencePanel | None = None,
+    local_demo: LocalDemoPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -580,6 +614,7 @@ def build_orchestrator_page(
     database = database or DatabasePanel("", False, 0, "", 0, {})
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
+    local_demo = local_demo or LocalDemoPanel("", False, "MISSING", "", 0, 0, 0, False, "", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -592,6 +627,7 @@ def build_orchestrator_page(
     database_html = _database_html(database)
     testnet_demo_html = _testnet_demo_html(testnet_demo)
     live_evidence_html = _live_evidence_html(live_evidence)
+    local_demo_html = _local_demo_html(local_demo)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -727,6 +763,11 @@ def build_orchestrator_page(
       <h2>Demo Walkthrough</h2>
       <div>{walkthrough_html}</div>
       <p class="small">Ikuti urutan ini untuk demo lokal yang aman. Semua langkah tetap paper/demo dan read-only untuk live.</p>
+    </section>
+    <section class="panel">
+      <h2>Local Demo Readiness</h2>
+      <div>{local_demo_html}</div>
+      <p class="small">Panel ini memastikan demo lokal siap dipakai tanpa real-money live execution.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -904,6 +945,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/live-evidence":
                     self._json_response(asdict(load_live_evidence_panel(config_path)))
                     return
+                if parsed.path == "/api/local-demo":
+                    self._json_response(asdict(load_local_demo_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -939,6 +983,7 @@ def _handler_factory(config_path: Path):
                 database = load_database_panel(config_path)
                 testnet_demo = load_testnet_demo_panel(config_path)
                 live_evidence = load_live_evidence_panel(config_path)
+                local_demo = load_local_demo_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -953,6 +998,7 @@ def _handler_factory(config_path: Path):
                         database,
                         testnet_demo,
                         live_evidence,
+                        local_demo,
                         pnl,
                         walkthrough,
                     )
@@ -1344,6 +1390,39 @@ def _demo_walkthrough_html(steps: list[DemoWalkthroughStep]) -> str:
     return '<div class="walkthrough">' + "".join(cards) + "</div>"
 
 
+def _local_demo_html(panel: LocalDemoPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    live_css = "ok" if panel.live_locked else "danger"
+    check_rows = []
+    for check in panel.checks:
+        name = str(check.get("name", ""))
+        status = str(check.get("status", ""))
+        reason = str(check.get("reason", ""))
+        next_action = str(check.get("next_action", ""))
+        check_rows.append(
+            "<tr>"
+            f"<td>{escape(name)}</td>"
+            f'<td><span class="badge {_report_status_class(status)}">{escape(status)}</span></td>'
+            f"<td>{escape(reason)}</td>"
+            f"<td>{escape(next_action)}</td>"
+            "</tr>"
+        )
+    rows = "".join(check_rows) if check_rows else '<tr><td colspan="4">Belum ada report. Klik Local Demo.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Demo Lokal", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Live Lock", f'<span class="badge {live_css}">{"LOCKED" if panel.live_locked else "CHECK"}</span>')
+        + _metric("Candle Demo", panel.candle_rows)
+        + _metric("Paper Trades", panel.paper_trades)
+        + _metric("Reports", panel.report_count)
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        '<table class="data-table">'
+        "<thead><tr><th>Check</th><th>Status</th><th>Alasan</th><th>Aksi Berikut</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -1716,6 +1795,7 @@ def _action_label(action: str) -> str:
     labels = {
         "validate_config": "Validasi Config",
         "seed_demo_data": "Demo Data",
+        "local_demo": "Local Demo",
         "import_runtime_db": "Import DB",
         "db_learning_report": "Learning DB",
         "build_dashboard": "Buat Dashboard",

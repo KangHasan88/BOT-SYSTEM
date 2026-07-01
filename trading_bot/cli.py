@@ -12,7 +12,7 @@ from trading_bot.data_collector.binance_public import BinancePublicKlineClient
 from trading_bot.data_collector.context_store import MarketContextCsvStore
 from trading_bot.data_collector.csv_store import CandleCsvStore
 from trading_bot.data_collector.service import MarketDataCollector
-from trading_bot.demo import seed_demo_data_pack
+from trading_bot.demo import build_local_demo_report, save_local_demo_report, seed_demo_data_pack
 from trading_bot.execution import ExchangeOrderRequest, SandboxExchangeAdapter, run_testnet_demo_report, save_testnet_demo_report
 from trading_bot.feature_engine import FeatureCsvStore, RegimeCsvStore, build_features, classify_regimes
 from trading_bot.live import LivePhaseOneConfig, build_live_phase_one_plan
@@ -106,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
     demo_data.add_argument("--config", default="config/bot.sample.toml")
     demo_data.add_argument("--candles-per-pair", type=int, default=180)
     demo_data.add_argument("--initial-equity", type=float, default=1_000.0)
+
+    local_demo = subparsers.add_parser("local-demo-report")
+    local_demo.add_argument("--config", default="config/bot.sample.toml")
+    local_demo.add_argument("--seed-demo-if-needed", action="store_true")
+    local_demo.add_argument("--candles-per-pair", type=int, default=180)
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -483,6 +488,30 @@ def main(argv: list[str] | None = None) -> int:
             f"paper_trades={result.paper_trades}, db_rows={result.database_rows}, "
             f"learning={result.learning_report_path}, dashboard={result.dashboard_path}"
         )
+        return 0
+
+    if args.command == "local-demo-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_local_demo_report(
+                config,
+                seed_demo_if_needed=args.seed_demo_if_needed,
+                candles_per_pair=args.candles_per_pair,
+            )
+            path = save_local_demo_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"local demo failed: {exc}")
+            return 2
+
+        print(
+            "local demo: "
+            f"status={report.status}, seeded_demo_data={str(report.seeded_demo_data).lower()}, "
+            f"candles={report.candle_rows}, paper_trades={report.paper_trades}, "
+            f"reports={report.report_count}, live_locked={str(report.live_locked).lower()}, path={path}"
+        )
+        for check in report.checks:
+            if check.status != "PASS":
+                print(f"todo: {check.name}: {check.status} {check.reason} -> {check.next_action}")
         return 0
 
     if args.command == "sync-ohlcv":
