@@ -29,6 +29,13 @@ python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT 
 work/market_data/execution/testnet_demo/report.json
 ```
 
+Di web orchestrator, report yang sama tampil di panel `Demo/Testnet Monitoring`
+dan API read-only:
+
+```text
+http://127.0.0.1:8000/api/testnet-demo
+```
+
 ## Guard
 
 - Real live key tidak dibutuhkan untuk demo account.

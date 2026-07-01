@@ -111,6 +111,20 @@ class DatabasePanel:
     table_rows: dict[str, int]
 
 
+@dataclass(frozen=True)
+class TestnetDemoPanel:
+    report_path: str
+    exists: bool
+    status: str
+    environment: str
+    generated_at_utc: str
+    order_count: int
+    live_guard_status: str
+    live_guard_reason: str
+    orders: list[dict]
+    notes: list[str]
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -236,6 +250,26 @@ def load_incident_panel(config_path: str | Path = "config/bot.sample.toml") -> I
 def load_database_panel(config_path: str | Path = "config/bot.sample.toml") -> DatabasePanel:
     config = load_config(Path(config_path))
     return _database_panel_from_status(load_database_status(config.data_root))
+
+
+def load_testnet_demo_panel(config_path: str | Path = "config/bot.sample.toml") -> TestnetDemoPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "execution" / "testnet_demo" / "report.json"
+    payload = _read_json(path) or {}
+    orders = payload.get("orders", [])
+    notes = payload.get("notes", [])
+    return TestnetDemoPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        environment=str(payload.get("environment", "")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        order_count=len(orders) if isinstance(orders, list) else 0,
+        live_guard_status=str(payload.get("live_guard_status", "MISSING")),
+        live_guard_reason=str(payload.get("live_guard_reason", "")),
+        orders=orders if isinstance(orders, list) else [],
+        notes=notes if isinstance(notes, list) else [],
+    )
 
 
 def update_kill_switch_from_web(
@@ -367,6 +401,7 @@ def build_orchestrator_page(
     reports: list[ReportItem] | None = None,
     incident: IncidentPanel | None = None,
     database: DatabasePanel | None = None,
+    testnet_demo: TestnetDemoPanel | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
@@ -375,6 +410,7 @@ def build_orchestrator_page(
     reports = reports or []
     incident = incident or IncidentPanel(False, "", "", "MISSING", "", 0, "belum ada laporan incident drill")
     database = database or DatabasePanel("", False, 0, "", 0, {})
+    testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -383,6 +419,7 @@ def build_orchestrator_page(
     reports_html = _reports_html(reports)
     incident_html = _incident_html(incident)
     database_html = _database_html(database)
+    testnet_demo_html = _testnet_demo_html(testnet_demo)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -507,6 +544,11 @@ def build_orchestrator_page(
       <h2>Database Lokal</h2>
       <div>{database_html}</div>
       <p class="small">SQLite ini arsip lokal untuk data harian, audit, dan aktivitas bot. Klik Import DB setelah sinkron/paper cycle.</p>
+    </section>
+    <section class="panel">
+      <h2>Demo/Testnet Monitoring</h2>
+      <div>{testnet_demo_html}</div>
+      <p class="small">Panel ini read-only dari report demo/testnet. Tidak ada real live order di sini.</p>
     </section>
     <section class="panel">
       <h2>Kill Switch & Incident</h2>
@@ -635,6 +677,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/database":
                     self._json_response(asdict(load_database_panel(config_path)))
                     return
+                if parsed.path == "/api/testnet-demo":
+                    self._json_response(asdict(load_testnet_demo_panel(config_path)))
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -662,7 +707,8 @@ def _handler_factory(config_path: Path):
                 reports = load_report_browser(config_path)
                 incident = load_incident_panel(config_path)
                 database = load_database_panel(config_path)
-                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident, database))
+                testnet_demo = load_testnet_demo_panel(config_path)
+                self._html_response(build_orchestrator_page(status, activities, audit_events, health, setup, reports, incident, database, testnet_demo))
             except (ConfigError, ValueError, OSError) as exc:
                 self._json_response({"error": str(exc)}, status=500)
 
@@ -954,6 +1000,52 @@ def _database_panel_from_status(status: DatabaseStatus) -> DatabasePanel:
         updated_at_utc=status.updated_at_utc,
         total_rows=status.total_rows,
         table_rows={table.table: table.rows for table in status.tables},
+    )
+
+
+def _testnet_demo_html(panel: TestnetDemoPanel) -> str:
+    if not panel.exists:
+        return (
+            '<p class="small">Belum ada report demo/testnet. Klik '
+            '<strong>Testnet Demo</strong> untuk membuat simulasi akun demo.</p>'
+        )
+    status_css = "ok" if panel.status == "PASSED" else "danger" if panel.status == "FAILED" else "warn"
+    live_guard_css = "ok" if panel.live_guard_status == "PASS" else "danger"
+    rows = []
+    for order in panel.orders:
+        if not isinstance(order, dict):
+            continue
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(order.get('order_id', '')))}</td>"
+            f"<td>{escape(str(order.get('symbol', '')))}</td>"
+            f"<td>{escape(str(order.get('side', '')))}</td>"
+            f"<td>{escape(str(order.get('order_type', '')))}</td>"
+            f"<td>{escape(str(order.get('quantity', '')))}</td>"
+            f"<td>{escape(str(order.get('status', '')))}</td>"
+            f"<td>{escape(str(order.get('source', '')))}</td>"
+            "</tr>"
+        )
+    order_table = (
+        '<table class="data-table">'
+        "<thead><tr><th>Order ID</th><th>Symbol</th><th>Side</th><th>Type</th><th>Qty</th><th>Status</th><th>Source</th></tr></thead>"
+        "<tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+    notes = "".join(f"<li>{escape(str(note))}</li>" for note in panel.notes)
+    return (
+        '<div class="grid">'
+        + _metric("Status Demo", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Environment", panel.environment or "-")
+        + _metric("Orders", panel.order_count)
+        + _metric("Live Guard", f'<span class="badge {live_guard_css}">{escape(panel.live_guard_status)}</span>')
+        + "</div>"
+        + f'<p class="small">Generated: {escape(panel.generated_at_utc or "-")}</p>'
+        + f'<p class="small">Live guard reason: {escape(panel.live_guard_reason or "-")}</p>'
+        + order_table
+        + (f'<ul class="small">{notes}</ul>' if notes else "")
+        + f'<p class="small">Path: <code>{escape(panel.report_path)}</code></p>'
     )
 
 

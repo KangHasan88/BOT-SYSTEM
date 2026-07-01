@@ -130,6 +130,18 @@ SQLite. Output-nya muncul di Browser Laporan sebagai kategori `Learning`.
 Untuk demo akun pertama, gunakan `Demo Data` dan paper/sandbox dulu. Ini membuat
 bot bisa dipakai end-to-end tanpa real-money live key.
 
+## Demo/Testnet Monitoring
+
+Panel `Demo/Testnet Monitoring` menampilkan report terakhir dari tombol
+`Testnet Demo`: status demo, environment, live guard, dan daftar order demo.
+Panel ini read-only dan tidak punya tombol real live order.
+
+Ringkasan yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/testnet-demo
+```
+
 ## Kill Switch Dan Incident Panel
 
 Halaman utama punya panel safety untuk:

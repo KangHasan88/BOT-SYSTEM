@@ -8,6 +8,7 @@ from pathlib import Path
 from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
+    TestnetDemoPanel,
     build_orchestrator_page,
     load_database_panel,
     load_health_summary,
@@ -15,6 +16,7 @@ from trading_bot.orchestrator import (
     load_orchestrator_status,
     load_report_browser,
     load_setup_wizard,
+    load_testnet_demo_panel,
     recent_audit_events,
     run_orchestrator_action,
     update_kill_switch_from_web,
@@ -43,6 +45,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Setup Cepat", html)
         self.assertIn("Browser Laporan", html)
         self.assertIn("Database Lokal", html)
+        self.assertIn("Demo/Testnet Monitoring", html)
         self.assertIn("Kill Switch & Incident", html)
         self.assertIn("Tidak ada tombol live buy/sell/order", html)
         self.assertIn("Timeline Audit", html)
@@ -87,6 +90,7 @@ class OrchestratorTest(unittest.TestCase):
             _write_json(data_root / "backtests" / "BTC_USDT" / "15m" / "metrics.json", {"recommendation": "PAPER_CANDIDATE", "trade_count": 30})
             _write_json(data_root / "validation" / "walk_forward" / "BTC_USDT" / "15m.json", {"recommendation": "PASS", "total_test_trades": 30})
             _write_json(data_root / "reports" / "daily" / "BTC_USDT" / "15m" / "2026-06-30.json", {"review_status": "NEUTRAL", "paper_trade_count": 0})
+            _write_json(data_root / "execution" / "testnet_demo" / "report.json", {"status": "PASSED", "orders": []})
             paper_path = data_root / "paper" / "BTC_USDT" / "trades.csv"
             paper_path.parent.mkdir(parents=True, exist_ok=True)
             paper_path.write_text("symbol,timeframe,net_pnl\nBTC/USDT,15m,1.2\n", encoding="utf-8")
@@ -98,6 +102,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Walk-Forward", categories)
         self.assertIn("Paper", categories)
         self.assertIn("Daily Journal", categories)
+        self.assertIn("Testnet Demo", categories)
         self.assertTrue(all(report.path for report in reports))
 
     def test_database_panel_renders_local_sqlite_summary(self) -> None:
@@ -129,6 +134,50 @@ class OrchestratorTest(unittest.TestCase):
         self.assertFalse(panel.exists)
         self.assertEqual(0, panel.total_rows)
         self.assertIn("bot.sqlite3", panel.db_path)
+
+    def test_testnet_demo_panel_renders_read_only_monitoring(self) -> None:
+        panel = TestnetDemoPanel(
+            report_path="work/market_data/execution/testnet_demo/report.json",
+            exists=True,
+            status="PASSED",
+            environment="testnet",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            order_count=1,
+            live_guard_status="PASS",
+            live_guard_reason="live rejected",
+            orders=[
+                {
+                    "order_id": "testnet-1",
+                    "symbol": "BTC/USDT",
+                    "side": "buy",
+                    "order_type": "market",
+                    "quantity": 0.001,
+                    "status": "FILLED",
+                    "source": "testnet",
+                }
+            ],
+            notes=["demo only"],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, testnet_demo=panel)
+
+        self.assertIn("Demo/Testnet Monitoring", html)
+        self.assertIn("Status Demo", html)
+        self.assertIn("testnet-1", html)
+        self.assertIn("live rejected", html)
+
+    def test_testnet_demo_panel_loader_reports_missing_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "bot.toml"
+            _write_config(config_path, root / "data")
+
+            panel = load_testnet_demo_panel(config_path)
+
+        self.assertFalse(panel.exists)
+        self.assertEqual("MISSING", panel.status)
+        self.assertIn("testnet_demo", panel.report_path)
 
     def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
