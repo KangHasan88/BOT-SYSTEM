@@ -27,9 +27,11 @@ from trading_bot.qa import (
     DataQualityGateConfig,
     EvidenceCampaignConfig,
     PaperStabilityConfig,
+    PaperCampaignConfig,
     evaluate_data_quality_gate,
     evaluate_live_go_no_go,
     evaluate_paper_stability,
+    evaluate_paper_campaign,
     evaluate_production_smoke,
     evaluate_vps_readiness,
     generate_security_qa_report,
@@ -40,6 +42,7 @@ from trading_bot.qa import (
     save_incident_drill_report,
     save_live_go_no_go_report,
     save_paper_stability_report,
+    save_paper_campaign_report,
     save_production_smoke_report,
     save_risk_guard_drill_report,
     save_security_qa_report,
@@ -351,6 +354,12 @@ def build_parser() -> argparse.ArgumentParser:
     paper_stability.add_argument("--timeframe", required=True)
     paper_stability.add_argument("--min-days", type=int, default=14)
     paper_stability.add_argument("--min-trades", type=int, default=20)
+
+    paper_campaign = subparsers.add_parser("paper-campaign-report")
+    paper_campaign.add_argument("--config", default="config/bot.sample.toml")
+    paper_campaign.add_argument("--min-days", type=int, default=14)
+    paper_campaign.add_argument("--preferred-days", type=int, default=28)
+    paper_campaign.add_argument("--min-trades", type=int, default=20)
 
     risk_drill = subparsers.add_parser("risk-guard-drill")
     risk_drill.add_argument("--config", default="config/bot.sample.toml")
@@ -1393,6 +1402,32 @@ def main(argv: list[str] | None = None) -> int:
         for warning in report.warnings:
             print(f"warning: {warning}")
         return 0 if report.status == "PAPER_STABLE" else 2
+
+    if args.command == "paper-campaign-report":
+        try:
+            config = load_config(Path(args.config))
+            report = evaluate_paper_campaign(
+                config,
+                PaperCampaignConfig(
+                    min_days=args.min_days,
+                    preferred_days=args.preferred_days,
+                    min_trades=args.min_trades,
+                ),
+            )
+            path = save_paper_campaign_report(report, config.data_root)
+        except (ConfigError, ValueError) as exc:
+            print(f"paper campaign failed: {exc}")
+            return 2
+
+        print(
+            "paper campaign: "
+            f"status={report.status}, completion={report.completion_pct:.2f}, "
+            f"pairs={report.pairs_checked}, stable_pairs={report.stable_pair_count}, "
+            f"trades={report.total_trade_count}, net_pnl={report.total_net_pnl:.8f}, path={path}"
+        )
+        for blocker in report.blockers:
+            print(f"blocker: {blocker}")
+        return 0
 
     if args.command == "risk-guard-drill":
         try:

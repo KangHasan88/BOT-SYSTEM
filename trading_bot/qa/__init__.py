@@ -29,6 +29,13 @@ from trading_bot.qa.paper_stability import (
     evaluate_paper_stability,
     save_paper_stability_report,
 )
+from trading_bot.qa.paper_campaign import (
+    PaperCampaignConfig,
+    PaperCampaignPair,
+    PaperCampaignReport,
+    evaluate_paper_campaign,
+    save_paper_campaign_report,
+)
 from trading_bot.qa.production_smoke import (
     ProductionSmokeCheck,
     ProductionSmokeReport,
@@ -52,6 +59,9 @@ from trading_bot.qa.vps_readiness import (
 __all__ = [
     "PaperStabilityConfig",
     "PaperStabilityReport",
+    "PaperCampaignConfig",
+    "PaperCampaignPair",
+    "PaperCampaignReport",
     "DataQualityGateConfig",
     "DataQualityGateReport",
     "EvidenceCampaignConfig",
@@ -71,6 +81,8 @@ __all__ = [
     "save_live_go_no_go_report",
     "evaluate_paper_stability",
     "save_paper_stability_report",
+    "evaluate_paper_campaign",
+    "save_paper_campaign_report",
     "ProductionSmokeCheck",
     "ProductionSmokeReport",
     "evaluate_production_smoke",

@@ -31,6 +31,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "live_evidence": ("live-evidence-report", "--config", "{config}"),
     "evidence_campaign": ("evidence-campaign-report", "--config", "{config}", "--seed-demo-if-needed"),
     "testnet_demo": ("testnet-demo-report", "--config", "{config}", "--environment", "testnet"),
+    "paper_campaign": ("paper-campaign-report", "--config", "{config}"),
     "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
     "sync_eth_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "ETH/USDT", "--timeframe", "15m", "--limit", "{limit}"),
@@ -153,6 +154,22 @@ class LocalDemoPanel:
     live_locked: bool
     summary: str
     checks: list[dict]
+
+
+@dataclass(frozen=True)
+class PaperCampaignPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    completion_pct: float
+    pairs_checked: int
+    stable_pair_count: int
+    total_trade_count: int
+    total_net_pnl: float
+    summary: str
+    blockers: list[str]
+    pairs: list[dict]
 
 
 @dataclass(frozen=True)
@@ -385,6 +402,26 @@ def load_local_demo_panel(config_path: str | Path = "config/bot.sample.toml") ->
     )
 
 
+def load_paper_campaign_panel(config_path: str | Path = "config/bot.sample.toml") -> PaperCampaignPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "qa" / "paper_campaign" / "report.json"
+    payload = _read_json(path) or {}
+    return PaperCampaignPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        completion_pct=float(payload.get("completion_pct", 0) or 0),
+        pairs_checked=int(payload.get("pairs_checked", 0) or 0),
+        stable_pair_count=int(payload.get("stable_pair_count", 0) or 0),
+        total_trade_count=int(payload.get("total_trade_count", 0) or 0),
+        total_net_pnl=float(payload.get("total_net_pnl", 0) or 0),
+        summary=str(payload.get("summary", "Klik Paper Campaign untuk membuat tracker evidence.")),
+        blockers=list(payload.get("blockers", [])) if isinstance(payload.get("blockers", []), list) else [],
+        pairs=list(payload.get("pairs", [])) if isinstance(payload.get("pairs", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -602,6 +639,7 @@ def build_orchestrator_page(
     testnet_demo: TestnetDemoPanel | None = None,
     live_evidence: LiveEvidencePanel | None = None,
     local_demo: LocalDemoPanel | None = None,
+    paper_campaign: PaperCampaignPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -615,6 +653,7 @@ def build_orchestrator_page(
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
     local_demo = local_demo or LocalDemoPanel("", False, "MISSING", "", 0, 0, 0, False, "", [])
+    paper_campaign = paper_campaign or PaperCampaignPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "", [], [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -628,6 +667,7 @@ def build_orchestrator_page(
     testnet_demo_html = _testnet_demo_html(testnet_demo)
     live_evidence_html = _live_evidence_html(live_evidence)
     local_demo_html = _local_demo_html(local_demo)
+    paper_campaign_html = _paper_campaign_html(paper_campaign)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -768,6 +808,11 @@ def build_orchestrator_page(
       <h2>Local Demo Readiness</h2>
       <div>{local_demo_html}</div>
       <p class="small">Panel ini memastikan demo lokal siap dipakai tanpa real-money live execution.</p>
+    </section>
+    <section class="panel">
+      <h2>Paper Campaign</h2>
+      <div>{paper_campaign_html}</div>
+      <p class="small">Target campaign: minimal 14 hari, ideal 28 hari, dan minimal 20 paper trades sebelum live review.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -948,6 +993,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/local-demo":
                     self._json_response(asdict(load_local_demo_panel(config_path)))
                     return
+                if parsed.path == "/api/paper-campaign":
+                    self._json_response(asdict(load_paper_campaign_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -984,6 +1032,7 @@ def _handler_factory(config_path: Path):
                 testnet_demo = load_testnet_demo_panel(config_path)
                 live_evidence = load_live_evidence_panel(config_path)
                 local_demo = load_local_demo_panel(config_path)
+                paper_campaign = load_paper_campaign_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -999,6 +1048,7 @@ def _handler_factory(config_path: Path):
                         testnet_demo,
                         live_evidence,
                         local_demo,
+                        paper_campaign,
                         pnl,
                         walkthrough,
                     )
@@ -1423,6 +1473,44 @@ def _local_demo_html(panel: LocalDemoPanel) -> str:
     )
 
 
+def _paper_campaign_html(panel: PaperCampaignPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    pnl_css = "ok" if panel.total_net_pnl >= 0 else "danger"
+    rows = []
+    for pair in panel.pairs:
+        status = str(pair.get("status", ""))
+        blockers = pair.get("blockers", [])
+        blocker_text = "; ".join(str(item) for item in blockers) if isinstance(blockers, list) else str(blockers)
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(pair.get('symbol', '')))}</td>"
+            f"<td>{escape(str(pair.get('timeframe', '')))}</td>"
+            f'<td><span class="badge {_report_status_class(status)}">{escape(status)}</span></td>'
+            f"<td>{int(pair.get('observed_days', 0) or 0)} / {int(pair.get('target_days', 0) or 0)}</td>"
+            f"<td>{int(pair.get('trade_count', 0) or 0)} / {int(pair.get('target_trades', 0) or 0)}</td>"
+            f"<td>{float(pair.get('net_pnl', 0) or 0):.8f}</td>"
+            f"<td>{escape(blocker_text or '-')}</td>"
+            "</tr>"
+        )
+    table_rows = "".join(rows) if rows else '<tr><td colspan="7">Belum ada report. Klik Paper Campaign.</td></tr>'
+    blocker_rows = "".join(f"<li>{escape(blocker)}</li>" for blocker in panel.blockers[:6])
+    blockers = f"<ul>{blocker_rows}</ul>" if blocker_rows else '<p class="small">Belum ada blocker aktif di report.</p>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Campaign", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Completion", f"{panel.completion_pct:.2f}%")
+        + _metric("Stable Pairs", f"{panel.stable_pair_count} / {panel.pairs_checked}")
+        + _metric("Paper Trades", panel.total_trade_count)
+        + _metric("Net P/L Paper", f'<span class="badge {pnl_css}">{panel.total_net_pnl:.8f}</span>')
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        + blockers
+        + '<table class="data-table">'
+        + "<thead><tr><th>Symbol</th><th>TF</th><th>Status</th><th>Hari</th><th>Trades</th><th>Net P/L</th><th>Blocker</th></tr></thead>"
+        + f"<tbody>{table_rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -1806,6 +1894,7 @@ def _action_label(action: str) -> str:
         "live_evidence": "Live Evidence",
         "evidence_campaign": "Evidence Campaign",
         "testnet_demo": "Testnet Demo",
+        "paper_campaign": "Paper Campaign",
         "run_cycle": "Jalankan Siklus",
         "sync_btc_15m": "Sinkron BTC 15m",
         "sync_eth_15m": "Sinkron ETH 15m",

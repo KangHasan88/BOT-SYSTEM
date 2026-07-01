@@ -11,6 +11,7 @@ from trading_bot.orchestrator import (
     DemoWalkthroughStep,
     LiveEvidencePanel,
     LocalDemoPanel,
+    PaperCampaignPanel,
     PnlPanel,
     PnlTradeRow,
     TestnetDemoPanel,
@@ -22,6 +23,7 @@ from trading_bot.orchestrator import (
     load_live_evidence_panel,
     load_local_demo_panel,
     load_orchestrator_status,
+    load_paper_campaign_panel,
     load_pnl_panel,
     load_report_browser,
     load_setup_wizard,
@@ -56,6 +58,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Control Room Awam", html)
         self.assertIn("Demo Walkthrough", html)
         self.assertIn("Local Demo Readiness", html)
+        self.assertIn("Paper Campaign", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -347,6 +350,70 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("READY_FOR_LOCAL_DEMO", panel.status)
         self.assertEqual(2, panel.paper_trades)
+
+    def test_paper_campaign_panel_renders_campaign_progress(self) -> None:
+        panel = PaperCampaignPanel(
+            report_path="work/market_data/qa/paper_campaign/report.json",
+            exists=True,
+            status="PAPER_CAMPAIGN_COLLECTING",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            completion_pct=71.43,
+            pairs_checked=1,
+            stable_pair_count=0,
+            total_trade_count=19,
+            total_net_pnl=12.5,
+            summary="1 blocker(s) still collecting evidence",
+            blockers=["BTC/USDT 15m: observed_days 7 < required 14"],
+            pairs=[
+                {
+                    "symbol": "BTC/USDT",
+                    "timeframe": "15m",
+                    "status": "BLOCKED",
+                    "observed_days": 7,
+                    "target_days": 14,
+                    "trade_count": 19,
+                    "target_trades": 20,
+                    "net_pnl": 12.5,
+                    "blockers": ["observed_days 7 < required 14"],
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, paper_campaign=panel)
+
+        self.assertIn("Paper Campaign", html)
+        self.assertIn("71.43%", html)
+        self.assertIn("BTC/USDT", html)
+        self.assertIn("observed_days 7", html)
+
+    def test_paper_campaign_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "qa" / "paper_campaign" / "report.json",
+                {
+                    "status": "PAPER_CAMPAIGN_READY",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "completion_pct": 100.0,
+                    "pairs_checked": 1,
+                    "stable_pair_count": 1,
+                    "total_trade_count": 20,
+                    "total_net_pnl": 1.6,
+                    "summary": "ready",
+                    "blockers": [],
+                    "pairs": [{"symbol": "BTC/USDT", "timeframe": "15m"}],
+                },
+            )
+
+            panel = load_paper_campaign_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("PAPER_CAMPAIGN_READY", panel.status)
+        self.assertEqual(20, panel.total_trade_count)
 
     def test_pnl_panel_loader_reads_paper_csv(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

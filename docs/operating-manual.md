@@ -105,6 +105,7 @@ python -m trading_bot.cli walk-forward-report --symbol BTC/USDT --timeframe 15m
 ```bash
 python -m trading_bot.cli run-paper --symbol BTC/USDT --timeframe 15m --initial-equity 1000
 python -m trading_bot.cli post-trade-report --symbol BTC/USDT --timeframe 15m
+python -m trading_bot.cli paper-campaign-report --config config/bot.sample.toml --min-days 14 --preferred-days 28 --min-trades 20
 python -m trading_bot.cli paper-stability-report --symbol BTC/USDT --timeframe 15m --min-days 14 --min-trades 20
 python -m trading_bot.cli daily-journal --symbol BTC/USDT --timeframe 15m --initial-equity 1000
 ```

@@ -16,13 +16,19 @@ using real exchange execution.
 
 ```bash
 python -m trading_bot.cli paper-stability-report --config config/bot.sample.toml --symbol BTC/USDT --timeframe 15m --min-days 14 --min-trades 20
+python -m trading_bot.cli paper-campaign-report --config config/bot.sample.toml --min-days 14 --preferred-days 28 --min-trades 20
 ```
 
 The report is saved at:
 
 ```text
 work/market_data/qa/paper_stability/BTC_USDT/15m/report.json
+work/market_data/qa/paper_campaign/report.json
 ```
+
+`paper-campaign-report` merangkum semua symbol/timeframe paper dalam satu
+tracker campaign: completion percent, stable pair count, total trades, net P/L,
+dan blocker yang masih harus dikumpulkan.
 
 ## Decision Rules
 

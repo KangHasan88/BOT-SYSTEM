@@ -60,6 +60,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 - Live Go/No-Go report;
 - Live Evidence gate;
 - Evidence Campaign untuk refresh seluruh bukti readiness lokal;
+- Paper Campaign untuk monitor evidence paper 2-4 minggu;
 - Jalankan Siklus offline-safe;
 - Sinkron data terbaru BTC/USDT 15m;
 - Sinkron data terbaru ETH/USDT 15m.
@@ -160,6 +161,24 @@ live account. Data yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/pnl
+```
+
+## Paper Campaign
+
+Panel `Paper Campaign` membaca:
+
+```text
+work/market_data/qa/paper_campaign/report.json
+```
+
+Klik tombol `Paper Campaign` untuk refresh tracker paper 2-4 minggu. Panel ini
+menampilkan completion percent, jumlah pair stabil, total paper trade, net P/L
+paper, blocker aktif, dan detail per symbol/timeframe.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/paper-campaign
 ```
 
 ## Setup Cepat

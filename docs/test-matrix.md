@@ -53,6 +53,7 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | Backtest metrics | `tests/test_backtest_metrics_unittest.py` | unit | Reject weak metrics and small sample |
 | Paper simulator | `tests/test_paper_simulator_unittest.py` | integration | Paper-only orders, risk rejects, journal export |
 | Paper stability QA | `tests/test_paper_stability_unittest.py` | integration | Block live review until 2-4 week paper evidence is stable |
+| Paper campaign | `tests/test_paper_campaign_unittest.py` | integration | Aggregate 2-4 week paper evidence before live review |
 | Daily journal | `tests/test_daily_journal_unittest.py` | integration | Summarize regime, pattern, paper result, review status |
 | Dashboard | `tests/test_dashboard_unittest.py` | unit | Render dashboard safely and escape report text |
 | Local orchestrator | `tests/test_orchestrator_unittest.py` | unit | Render safe local web UI and block live order actions |
