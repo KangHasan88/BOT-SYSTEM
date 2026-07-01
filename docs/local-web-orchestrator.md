@@ -97,6 +97,27 @@ ini menampilkan ringkasan kondisi bot, mode akun, P/L demo, evidence live, dan
 Setiap step punya hover message agar user paham arti status tanpa membuka file
 teknis. Panel ini tetap read-only dan tidak menyediakan tombol real live order.
 
+## P/L Visual Monitor
+
+Panel `P/L Visual Monitor` membaca hasil paper/demo dari file `account.csv` dan
+`trades.csv`. Panel ini menampilkan:
+
+- realized P/L demo;
+- win rate;
+- jumlah trade;
+- equity terakhir;
+- perubahan equity;
+- best/worst trade;
+- mini equity curve;
+- trade terakhir.
+
+Semua angka di panel ini berasal dari simulasi paper/demo, bukan real-money
+live account. Data yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/pnl
+```
+
 ## Setup Cepat
 
 Halaman utama punya checklist first-run untuk:

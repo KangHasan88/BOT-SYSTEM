@@ -150,6 +150,31 @@ class BeginnerStep:
     action_label: str
 
 
+@dataclass(frozen=True)
+class PnlTradeRow:
+    symbol: str
+    timeframe: str
+    exit_time: str
+    entry_price: float
+    exit_price: float
+    net_pnl: float
+    exit_reason: str
+
+
+@dataclass(frozen=True)
+class PnlPanel:
+    trade_count: int
+    win_rate_pct: float
+    net_pnl: float
+    initial_equity: float
+    latest_equity: float
+    equity_change_pct: float
+    best_trade_pnl: float
+    worst_trade_pnl: float
+    latest_trade: PnlTradeRow | None
+    equity_points: list[float]
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -317,6 +342,31 @@ def load_live_evidence_panel(config_path: str | Path = "config/bot.sample.toml")
     )
 
 
+def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
+    config = load_config(Path(config_path))
+    root = Path(config.data_root) / "paper"
+    trades = _load_paper_trade_rows(root)
+    equity_series = _load_equity_series(root)
+    equity_points = _aggregate_equity_points(equity_series, 48)
+    win_count = sum(1 for trade in trades if trade.net_pnl > 0)
+    net_pnl = sum(trade.net_pnl for trade in trades)
+    initial_equity = sum(series[0] for series in equity_series if series)
+    latest_equity = sum(series[-1] for series in equity_series if series)
+    equity_change_pct = ((latest_equity - initial_equity) / initial_equity * 100) if initial_equity else 0.0
+    return PnlPanel(
+        trade_count=len(trades),
+        win_rate_pct=(win_count / len(trades) * 100) if trades else 0.0,
+        net_pnl=net_pnl,
+        initial_equity=initial_equity,
+        latest_equity=latest_equity,
+        equity_change_pct=equity_change_pct,
+        best_trade_pnl=max((trade.net_pnl for trade in trades), default=0.0),
+        worst_trade_pnl=min((trade.net_pnl for trade in trades), default=0.0),
+        latest_trade=trades[-1] if trades else None,
+        equity_points=equity_points,
+    )
+
+
 def update_kill_switch_from_web(
     action: str,
     reason: str,
@@ -448,6 +498,7 @@ def build_orchestrator_page(
     database: DatabasePanel | None = None,
     testnet_demo: TestnetDemoPanel | None = None,
     live_evidence: LiveEvidencePanel | None = None,
+    pnl: PnlPanel | None = None,
 ) -> str:
     activities = activities or []
     audit_events = audit_events or []
@@ -458,6 +509,7 @@ def build_orchestrator_page(
     database = database or DatabasePanel("", False, 0, "", 0, {})
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
+    pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
     audit_html = _audit_html(audit_events)
@@ -469,6 +521,7 @@ def build_orchestrator_page(
     testnet_demo_html = _testnet_demo_html(testnet_demo)
     live_evidence_html = _live_evidence_html(live_evidence)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
+    pnl_html = _pnl_panel_html(pnl)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
     kill_text = "AKTIF" if status.kill_switch_active else "Clear"
@@ -527,6 +580,13 @@ def build_orchestrator_page(
     .step-copy {{ color: #475569; font-size: 12px; line-height: 1.45; min-height: 34px; }}
     .step-action {{ margin-top: 8px; color: var(--muted); font-size: 12px; font-weight: 700; }}
     .help-dot {{ width: 20px; height: 20px; border-radius: 999px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: #475569; font-size: 12px; font-weight: 800; background: #f8fafc; flex: none; }}
+    .pnl-layout {{ display: grid; grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.4fr); gap: 12px; align-items: stretch; }}
+    .pnl-chart {{ width: 100%; min-height: 190px; border: 1px solid var(--soft-line); border-radius: 10px; background: #f8fafc; padding: 10px; }}
+    .pnl-chart svg {{ width: 100%; height: 160px; display: block; }}
+    .pnl-line {{ fill: none; stroke: var(--focus); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }}
+    .pnl-fill {{ fill: rgba(18, 59, 122, 0.10); }}
+    .pnl-zero {{ stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 4 4; }}
+    .pnl-table-wrap {{ overflow-x: auto; }}
     .badge {{ display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.35; }}
     .ok {{ background: #dcfce7; color: var(--good); }}
     .danger {{ background: #fee2e2; color: var(--bad); }}
@@ -554,6 +614,7 @@ def build_orchestrator_page(
       .shell {{ padding: 12px; }}
       .board-title {{ align-items: flex-start; }}
       .toolbar-group {{ width: 100%; }}
+      .pnl-layout {{ grid-template-columns: 1fr; }}
       .data-table {{ display: block; overflow-x: auto; }}
     }}
   </style>
@@ -580,6 +641,11 @@ def build_orchestrator_page(
     <section class="panel">
       <h2>Control Room Awam</h2>
       <div>{beginner_html}</div>
+    </section>
+    <section class="panel">
+      <h2>P/L Visual Monitor</h2>
+      <div>{pnl_html}</div>
+      <p class="small">Semua angka di panel ini berasal dari paper/demo trading, bukan uang asli.</p>
     </section>
     <section class="grid">
       {_metric("Mode", status.mode)}
@@ -752,6 +818,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/live-evidence":
                     self._json_response(asdict(load_live_evidence_panel(config_path)))
                     return
+                if parsed.path == "/api/pnl":
+                    self._json_response(asdict(load_pnl_panel(config_path)))
+                    return
                 if parsed.path == "/api/activity":
                     config = load_config(config_path)
                     rows = [asdict(row) for row in recent_activities(config.data_root)]
@@ -781,6 +850,7 @@ def _handler_factory(config_path: Path):
                 database = load_database_panel(config_path)
                 testnet_demo = load_testnet_demo_panel(config_path)
                 live_evidence = load_live_evidence_panel(config_path)
+                pnl = load_pnl_panel(config_path)
                 self._html_response(
                     build_orchestrator_page(
                         status,
@@ -793,6 +863,7 @@ def _handler_factory(config_path: Path):
                         database,
                         testnet_demo,
                         live_evidence,
+                        pnl,
                     )
                 )
             except (ConfigError, ValueError, OSError) as exc:
@@ -1114,6 +1185,76 @@ def _paper_pnl_text(reason: str) -> str:
         return f"{float(value):.8f}"
     except ValueError:
         return value or "0.00000000"
+
+
+def _pnl_panel_html(panel: PnlPanel) -> str:
+    pnl_css = "ok" if panel.net_pnl >= 0 else "danger"
+    latest_trade = panel.latest_trade
+    trade_rows = ""
+    if latest_trade is not None:
+        trade_rows = (
+            "<tr>"
+            f"<td>{escape(latest_trade.exit_time)}</td>"
+            f"<td>{escape(latest_trade.symbol)}</td>"
+            f"<td>{escape(latest_trade.timeframe)}</td>"
+            f"<td>{latest_trade.entry_price:.8f}</td>"
+            f"<td>{latest_trade.exit_price:.8f}</td>"
+            f'<td><span class="badge {"ok" if latest_trade.net_pnl >= 0 else "danger"}">{latest_trade.net_pnl:.8f}</span></td>'
+            f"<td>{escape(latest_trade.exit_reason)}</td>"
+            "</tr>"
+        )
+    else:
+        trade_rows = '<tr><td colspan="7">Belum ada trade paper.</td></tr>'
+    return (
+        '<div class="pnl-layout">'
+        '<div>'
+        '<div class="grid">'
+        + _metric("Realized P/L Demo", f'<span class="badge {pnl_css}">{panel.net_pnl:.8f}</span>')
+        + _metric("Win Rate", f"{panel.win_rate_pct:.2f}%")
+        + _metric("Trades", panel.trade_count)
+        + _metric("Equity Terakhir", f"{panel.latest_equity:.8f}")
+        + _metric("Equity Change", f"{panel.equity_change_pct:.2f}%")
+        + _metric("Best/Worst Trade", f"{panel.best_trade_pnl:.8f} / {panel.worst_trade_pnl:.8f}")
+        + "</div>"
+        "</div>"
+        '<div class="pnl-chart" title="Garis ini menunjukkan naik-turun saldo demo/paper dari waktu ke waktu.">'
+        + _equity_svg(panel.equity_points)
+        + '<p class="small">Equity curve demo/paper. Naik berarti saldo simulasi bertambah, turun berarti saldo simulasi berkurang.</p>'
+        "</div>"
+        "</div>"
+        '<div class="pnl-table-wrap">'
+        '<table class="data-table">'
+        "<thead><tr><th>Waktu Exit</th><th>Symbol</th><th>TF</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Alasan Exit</th></tr></thead>"
+        f"<tbody>{trade_rows}</tbody></table></div>"
+    )
+
+
+def _equity_svg(points: list[float]) -> str:
+    if not points:
+        return '<svg viewBox="0 0 420 160" role="img" aria-label="Belum ada equity curve"><text x="18" y="84" fill="#64748b" font-size="14">Belum ada equity curve.</text></svg>'
+    width = 420
+    height = 160
+    pad = 14
+    min_value = min(points)
+    max_value = max(points)
+    span = max(max_value - min_value, 1e-9)
+    coords = []
+    for index, value in enumerate(points):
+        x = pad + (index / max(len(points) - 1, 1)) * (width - pad * 2)
+        y = height - pad - ((value - min_value) / span) * (height - pad * 2)
+        coords.append((x, y))
+    line = " ".join(f"{x:.2f},{y:.2f}" for x, y in coords)
+    fill = f"{pad},{height - pad} " + line + f" {width - pad},{height - pad}"
+    zero_y = height - pad - ((points[0] - min_value) / span) * (height - pad * 2)
+    return (
+        '<svg viewBox="0 0 420 160" role="img" aria-label="Equity curve demo">'
+        f'<polyline class="pnl-fill" points="{fill}"></polyline>'
+        f'<line class="pnl-zero" x1="{pad}" y1="{zero_y:.2f}" x2="{width - pad}" y2="{zero_y:.2f}"></line>'
+        f'<polyline class="pnl-line" points="{line}"></polyline>'
+        f'<text x="{pad}" y="18" fill="#64748b" font-size="12">Start {points[0]:.2f}</text>'
+        f'<text x="{width - 112}" y="18" fill="#64748b" font-size="12">Now {points[-1]:.2f}</text>'
+        "</svg>"
+    )
 
 
 def _health_card(label: str, status: str, reason: str) -> str:
@@ -1501,6 +1642,72 @@ def _count_csv_rows(root: Path, filename: str) -> int:
         with path.open("r", newline="", encoding="utf-8") as handle:
             total += sum(1 for _ in csv.DictReader(handle))
     return total
+
+
+def _load_paper_trade_rows(root: Path) -> list[PnlTradeRow]:
+    rows: list[PnlTradeRow] = []
+    if not root.exists():
+        return rows
+    for path in root.rglob("trades.csv"):
+        if not path.exists() or path.stat().st_size == 0:
+            continue
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    rows.append(
+                        PnlTradeRow(
+                            symbol=str(row.get("symbol", "")),
+                            timeframe=str(row.get("timeframe", "")),
+                            exit_time=_format_ms(row.get("exit_time_ms", "")),
+                            entry_price=float(row.get("entry_price", 0) or 0),
+                            exit_price=float(row.get("exit_price", 0) or 0),
+                            net_pnl=float(row.get("net_pnl", 0) or 0),
+                            exit_reason=str(row.get("exit_reason", "")),
+                        )
+                    )
+                except ValueError:
+                    continue
+    return sorted(rows, key=lambda trade: trade.exit_time)
+
+
+def _load_equity_series(root: Path) -> list[list[float]]:
+    series: list[list[float]] = []
+    if not root.exists():
+        return series
+    for path in root.rglob("account.csv"):
+        if not path.exists() or path.stat().st_size == 0:
+            continue
+        points: list[tuple[int, float]] = []
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    points.append((int(row.get("open_time_ms", 0) or 0), float(row.get("equity", 0) or 0)))
+                except ValueError:
+                    continue
+        if points:
+            series.append([equity for _, equity in sorted(points)])
+    return series
+
+
+def _aggregate_equity_points(series: list[list[float]], limit: int) -> list[float]:
+    if not series:
+        return []
+    points: list[float] = []
+    for index in range(limit):
+        total = 0.0
+        for row in series:
+            source_index = round(index * (len(row) - 1) / max(limit - 1, 1))
+            total += row[source_index]
+        points.append(total)
+    return points
+
+
+def _format_ms(value: object) -> str:
+    try:
+        timestamp = int(str(value)) / 1000
+    except ValueError:
+        return ""
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="minutes")
 
 
 def _sum_csv_float(root: Path, filename: str, field: str) -> float:

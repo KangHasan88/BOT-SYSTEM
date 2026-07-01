@@ -9,6 +9,8 @@ from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
     LiveEvidencePanel,
+    PnlPanel,
+    PnlTradeRow,
     TestnetDemoPanel,
     build_orchestrator_page,
     load_database_panel,
@@ -16,6 +18,7 @@ from trading_bot.orchestrator import (
     load_incident_panel,
     load_live_evidence_panel,
     load_orchestrator_status,
+    load_pnl_panel,
     load_report_browser,
     load_setup_wizard,
     load_testnet_demo_panel,
@@ -50,6 +53,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
+        self.assertIn("P/L Visual Monitor", html)
         self.assertIn("Review Go Live", html)
         self.assertIn("Setup Cepat", html)
         self.assertIn("Browser Laporan", html)
@@ -230,6 +234,56 @@ class OrchestratorTest(unittest.TestCase):
         self.assertFalse(panel.exists)
         self.assertEqual("MISSING", panel.status)
         self.assertIn("live_evidence.json", panel.report_path)
+
+    def test_pnl_panel_renders_equity_curve_and_latest_trade(self) -> None:
+        pnl = PnlPanel(
+            trade_count=2,
+            win_rate_pct=50.0,
+            net_pnl=12.5,
+            initial_equity=1000.0,
+            latest_equity=1012.5,
+            equity_change_pct=1.25,
+            best_trade_pnl=14.0,
+            worst_trade_pnl=-1.5,
+            latest_trade=PnlTradeRow("BTC/USDT", "15m", "2026-07-01T00:00+00:00", 100.0, 105.0, 14.0, "SESSION_END"),
+            equity_points=[1000.0, 1004.0, 1012.5],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, pnl=pnl)
+
+        self.assertIn("P/L Visual Monitor", html)
+        self.assertIn("Realized P/L Demo", html)
+        self.assertIn("Equity curve demo", html)
+        self.assertIn("BTC/USDT", html)
+        self.assertIn("SESSION_END", html)
+
+    def test_pnl_panel_loader_reads_paper_csv(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            paper_root = data_root / "paper" / "BTC_USDT" / "15m"
+            paper_root.mkdir(parents=True)
+            (paper_root / "account.csv").write_text(
+                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
+                "1717200000000,1000,1000,1000,0,0,OPEN,\n"
+                "1717200900000,1008,1000,1000,0,0,OPEN,\n",
+                encoding="utf-8",
+            )
+            (paper_root / "trades.csv").write_text(
+                "symbol,timeframe,entry_time_ms,exit_time_ms,entry_price,exit_price,quantity,gross_pnl,fees,net_pnl,exit_reason\n"
+                "BTC/USDT,15m,1717200000000,1717200900000,100,108,1,8,0,8,SESSION_END\n",
+                encoding="utf-8",
+            )
+
+            panel = load_pnl_panel(config_path)
+
+        self.assertEqual(1, panel.trade_count)
+        self.assertEqual(100.0, panel.win_rate_pct)
+        self.assertEqual(8.0, panel.net_pnl)
+        self.assertEqual(1008.0, panel.latest_equity)
 
     def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
