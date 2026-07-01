@@ -12,7 +12,7 @@ from trading_bot.data_collector.binance_public import BinancePublicKlineClient
 from trading_bot.data_collector.context_store import MarketContextCsvStore
 from trading_bot.data_collector.csv_store import CandleCsvStore
 from trading_bot.data_collector.service import MarketDataCollector
-from trading_bot.demo import build_local_demo_report, save_local_demo_report, seed_demo_data_pack
+from trading_bot.demo import build_local_demo_report, build_vps_demo_report, save_local_demo_report, save_vps_demo_report, seed_demo_data_pack
 from trading_bot.execution import ExchangeOrderRequest, SandboxExchangeAdapter, run_testnet_demo_report, save_testnet_demo_report
 from trading_bot.feature_engine import FeatureCsvStore, RegimeCsvStore, build_features, classify_regimes
 from trading_bot.live import LivePhaseOneConfig, build_live_phase_one_plan
@@ -114,6 +114,13 @@ def build_parser() -> argparse.ArgumentParser:
     local_demo.add_argument("--config", default="config/bot.sample.toml")
     local_demo.add_argument("--seed-demo-if-needed", action="store_true")
     local_demo.add_argument("--candles-per-pair", type=int, default=180)
+
+    vps_demo = subparsers.add_parser("vps-demo-report")
+    vps_demo.add_argument("--config", default="config/bot.sample.toml")
+    vps_demo.add_argument("--vps-config", default="config/bot.vps.sample.toml")
+    vps_demo.add_argument("--service", default="deploy/systemd/trading-bot-orchestrator.service")
+    vps_demo.add_argument("--tunnel-script", default="scripts/start-vps-demo-tunnel.ps1")
+    vps_demo.add_argument("--runbook", default="docs/private-vps-demo-access.md")
 
     sync = subparsers.add_parser("sync-ohlcv")
     sync.add_argument("--config", default="config/bot.sample.toml")
@@ -517,6 +524,31 @@ def main(argv: list[str] | None = None) -> int:
             f"status={report.status}, seeded_demo_data={str(report.seeded_demo_data).lower()}, "
             f"candles={report.candle_rows}, paper_trades={report.paper_trades}, "
             f"reports={report.report_count}, live_locked={str(report.live_locked).lower()}, path={path}"
+        )
+        for check in report.checks:
+            if check.status != "PASS":
+                print(f"todo: {check.name}: {check.status} {check.reason} -> {check.next_action}")
+        return 0
+
+    if args.command == "vps-demo-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_vps_demo_report(
+                config,
+                vps_config_path=args.vps_config,
+                service_path=args.service,
+                tunnel_script_path=args.tunnel_script,
+                runbook_path=args.runbook,
+            )
+            path = save_vps_demo_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"vps demo failed: {exc}")
+            return 2
+
+        print(
+            "vps demo: "
+            f"status={report.status}, live_locked={str(report.live_locked).lower()}, "
+            f"private_url={report.private_url}, tunnel_url={report.tunnel_url}, path={path}"
         )
         for check in report.checks:
             if check.status != "PASS":

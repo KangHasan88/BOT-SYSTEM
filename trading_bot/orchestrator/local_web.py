@@ -21,6 +21,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "validate_config": ("validate-config", "--config", "{config}"),
     "seed_demo_data": ("seed-demo-data", "--config", "{config}", "--candles-per-pair", "{limit}"),
     "local_demo": ("local-demo-report", "--config", "{config}", "--seed-demo-if-needed"),
+    "vps_demo": ("vps-demo-report", "--config", "{config}"),
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
@@ -151,6 +152,20 @@ class LocalDemoPanel:
     candle_rows: int
     paper_trades: int
     report_count: int
+    live_locked: bool
+    summary: str
+    checks: list[dict]
+
+
+@dataclass(frozen=True)
+class VpsDemoPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    vps_config_path: str
+    private_url: str
+    tunnel_url: str
     live_locked: bool
     summary: str
     checks: list[dict]
@@ -422,6 +437,24 @@ def load_paper_campaign_panel(config_path: str | Path = "config/bot.sample.toml"
     )
 
 
+def load_vps_demo_panel(config_path: str | Path = "config/bot.sample.toml") -> VpsDemoPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "demo" / "vps_demo.json"
+    payload = _read_json(path) or {}
+    return VpsDemoPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        vps_config_path=str(payload.get("vps_config_path", "")),
+        private_url=str(payload.get("private_url", "")),
+        tunnel_url=str(payload.get("tunnel_url", "")),
+        live_locked=bool(payload.get("live_locked", False)),
+        summary=str(payload.get("summary", "Klik VPS Demo untuk membuat readiness report.")),
+        checks=list(payload.get("checks", [])) if isinstance(payload.get("checks", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -639,6 +672,7 @@ def build_orchestrator_page(
     testnet_demo: TestnetDemoPanel | None = None,
     live_evidence: LiveEvidencePanel | None = None,
     local_demo: LocalDemoPanel | None = None,
+    vps_demo: VpsDemoPanel | None = None,
     paper_campaign: PaperCampaignPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
@@ -653,6 +687,7 @@ def build_orchestrator_page(
     testnet_demo = testnet_demo or TestnetDemoPanel("", False, "MISSING", "", "", 0, "MISSING", "", [], [])
     live_evidence = live_evidence or LiveEvidencePanel("", False, "MISSING", 0, "", 0, "", [], [])
     local_demo = local_demo or LocalDemoPanel("", False, "MISSING", "", 0, 0, 0, False, "", [])
+    vps_demo = vps_demo or VpsDemoPanel("", False, "MISSING", "", "", "", "", False, "", [])
     paper_campaign = paper_campaign or PaperCampaignPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "", [], [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
@@ -667,6 +702,7 @@ def build_orchestrator_page(
     testnet_demo_html = _testnet_demo_html(testnet_demo)
     live_evidence_html = _live_evidence_html(live_evidence)
     local_demo_html = _local_demo_html(local_demo)
+    vps_demo_html = _vps_demo_html(vps_demo)
     paper_campaign_html = _paper_campaign_html(paper_campaign)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
@@ -808,6 +844,11 @@ def build_orchestrator_page(
       <h2>Local Demo Readiness</h2>
       <div>{local_demo_html}</div>
       <p class="small">Panel ini memastikan demo lokal siap dipakai tanpa real-money live execution.</p>
+    </section>
+    <section class="panel">
+      <h2>Private VPS Demo</h2>
+      <div>{vps_demo_html}</div>
+      <p class="small">Panel ini memeriksa kesiapan demo paper di VPS private lewat SSH tunnel/VPN only.</p>
     </section>
     <section class="panel">
       <h2>Paper Campaign</h2>
@@ -993,6 +1034,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/local-demo":
                     self._json_response(asdict(load_local_demo_panel(config_path)))
                     return
+                if parsed.path == "/api/vps-demo":
+                    self._json_response(asdict(load_vps_demo_panel(config_path)))
+                    return
                 if parsed.path == "/api/paper-campaign":
                     self._json_response(asdict(load_paper_campaign_panel(config_path)))
                     return
@@ -1032,6 +1076,7 @@ def _handler_factory(config_path: Path):
                 testnet_demo = load_testnet_demo_panel(config_path)
                 live_evidence = load_live_evidence_panel(config_path)
                 local_demo = load_local_demo_panel(config_path)
+                vps_demo = load_vps_demo_panel(config_path)
                 paper_campaign = load_paper_campaign_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
@@ -1048,6 +1093,7 @@ def _handler_factory(config_path: Path):
                         testnet_demo,
                         live_evidence,
                         local_demo,
+                        vps_demo,
                         paper_campaign,
                         pnl,
                         walkthrough,
@@ -1473,6 +1519,39 @@ def _local_demo_html(panel: LocalDemoPanel) -> str:
     )
 
 
+def _vps_demo_html(panel: VpsDemoPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    live_css = "ok" if panel.live_locked else "danger"
+    rows = []
+    for check in panel.checks:
+        name = str(check.get("name", ""))
+        status = str(check.get("status", ""))
+        reason = str(check.get("reason", ""))
+        next_action = str(check.get("next_action", ""))
+        rows.append(
+            "<tr>"
+            f"<td>{escape(name)}</td>"
+            f'<td><span class="badge {_report_status_class(status)}">{escape(status)}</span></td>'
+            f"<td>{escape(reason)}</td>"
+            f"<td>{escape(next_action)}</td>"
+            "</tr>"
+        )
+    table_rows = "".join(rows) if rows else '<tr><td colspan="4">Belum ada report. Klik VPS Demo.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status VPS Demo", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Live Lock", f'<span class="badge {live_css}">{"LOCKED" if panel.live_locked else "CHECK"}</span>')
+        + _metric("Private URL", escape(panel.private_url or "127.0.0.1:8000 di VPS"))
+        + _metric("Tunnel URL", escape(panel.tunnel_url or "127.0.0.1:18000 di laptop"))
+        + _metric("Config VPS", escape(panel.vps_config_path or "config/bot.vps.sample.toml"))
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        '<table class="data-table">'
+        "<thead><tr><th>Check</th><th>Status</th><th>Alasan</th><th>Aksi Berikut</th></tr></thead>"
+        f"<tbody>{table_rows}</tbody></table>"
+    )
+
+
 def _paper_campaign_html(panel: PaperCampaignPanel) -> str:
     status_css = _report_status_class(panel.status)
     pnl_css = "ok" if panel.total_net_pnl >= 0 else "danger"
@@ -1884,6 +1963,7 @@ def _action_label(action: str) -> str:
         "validate_config": "Validasi Config",
         "seed_demo_data": "Demo Data",
         "local_demo": "Local Demo",
+        "vps_demo": "VPS Demo",
         "import_runtime_db": "Import DB",
         "db_learning_report": "Learning DB",
         "build_dashboard": "Buat Dashboard",

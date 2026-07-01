@@ -52,6 +52,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 - Validasi Config;
 - Demo Data lokal tanpa exchange/live;
 - Local Demo readiness untuk cek jalur demo end-to-end;
+- VPS Demo readiness untuk cek jalur private VPS paper mode;
 - Import DB SQLite lokal;
 - Learning DB dari SQLite lokal;
 - Buat Dashboard statis;
@@ -140,6 +141,25 @@ Status yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/local-demo
+```
+
+## Private VPS Demo
+
+Panel `Private VPS Demo` membaca:
+
+```text
+work/market_data/demo/vps_demo.json
+```
+
+Klik tombol `VPS Demo` untuk memeriksa kesiapan demo VPS private. Panel ini
+mengecek config VPS paper-only, service web yang bind ke localhost, script SSH
+tunnel, runbook private access, evidence local demo, paper campaign, dan live
+lock.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/vps-demo
 ```
 
 ## P/L Visual Monitor

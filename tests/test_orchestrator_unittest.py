@@ -15,6 +15,7 @@ from trading_bot.orchestrator import (
     PnlPanel,
     PnlTradeRow,
     TestnetDemoPanel,
+    VpsDemoPanel,
     build_orchestrator_page,
     load_database_panel,
     load_demo_walkthrough,
@@ -28,6 +29,7 @@ from trading_bot.orchestrator import (
     load_report_browser,
     load_setup_wizard,
     load_testnet_demo_panel,
+    load_vps_demo_panel,
     recent_audit_events,
     run_orchestrator_action,
     update_kill_switch_from_web,
@@ -58,6 +60,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Control Room Awam", html)
         self.assertIn("Demo Walkthrough", html)
         self.assertIn("Local Demo Readiness", html)
+        self.assertIn("Private VPS Demo", html)
         self.assertIn("Paper Campaign", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
@@ -414,6 +417,61 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("PAPER_CAMPAIGN_READY", panel.status)
         self.assertEqual(20, panel.total_trade_count)
+
+    def test_vps_demo_panel_renders_private_access_summary(self) -> None:
+        panel = VpsDemoPanel(
+            report_path="work/market_data/demo/vps_demo.json",
+            exists=True,
+            status="READY_FOR_PRIVATE_VPS_DEMO",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            vps_config_path="config/bot.vps.sample.toml",
+            private_url="http://127.0.0.1:8000/",
+            tunnel_url="http://127.0.0.1:18000/",
+            live_locked=True,
+            summary="private VPS paper demo path is ready",
+            checks=[
+                {
+                    "name": "private_orchestrator_service",
+                    "status": "PASS",
+                    "reason": "service binds to 127.0.0.1",
+                    "next_action": "Install service",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, vps_demo=panel)
+
+        self.assertIn("Private VPS Demo", html)
+        self.assertIn("READY_FOR_PRIVATE_VPS_DEMO", html)
+        self.assertIn("127.0.0.1:18000", html)
+        self.assertIn("private_orchestrator_service", html)
+
+    def test_vps_demo_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "demo" / "vps_demo.json",
+                {
+                    "status": "READY_FOR_PRIVATE_VPS_DEMO",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "vps_config_path": "config/bot.vps.sample.toml",
+                    "private_url": "http://127.0.0.1:8000/",
+                    "tunnel_url": "http://127.0.0.1:18000/",
+                    "live_locked": True,
+                    "summary": "ready",
+                    "checks": [{"name": "live_lock", "status": "PASS"}],
+                },
+            )
+
+            panel = load_vps_demo_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("READY_FOR_PRIVATE_VPS_DEMO", panel.status)
+        self.assertTrue(panel.live_locked)
 
     def test_pnl_panel_loader_reads_paper_csv(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

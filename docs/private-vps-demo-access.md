@@ -66,6 +66,24 @@ Invoke-RestMethod http://127.0.0.1:18000/api/local-demo
 Invoke-RestMethod http://127.0.0.1:18000/api/paper-campaign
 ```
 
+## Demo Readiness Report
+
+Sebelum user demo lewat tunnel, buat report readiness:
+
+```bash
+python -m trading_bot.cli vps-demo-report --config config/bot.sample.toml
+```
+
+Report tersimpan di:
+
+```text
+work/market_data/demo/vps_demo.json
+```
+
+Di web lokal, klik `VPS Demo` untuk membuat report yang sama. Panel `Private
+VPS Demo` akan menampilkan status config VPS, service private, tunnel script,
+runbook, evidence lokal, paper campaign, dan live lock.
+
 ## Public Exposure Rejection
 
 Konfigurasi berikut ditolak untuk v1:
