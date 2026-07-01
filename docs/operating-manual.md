@@ -183,6 +183,7 @@ Rules:
 
 ## Research Extensions
 
+- Continuous skill roadmap: `docs/continuous-skill-roadmap.md`
 - Gold/XAUUSD: `python -m trading_bot.cli gold-research-plan`
 - AI/ML guardrails: `docs/ai-ml-guardrails.md`
 - Pattern dataset: `python -m trading_bot.cli build-research-dataset --symbol BTC/USDT --timeframe 15m`

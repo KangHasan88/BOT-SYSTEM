@@ -72,6 +72,7 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | Live phase one | `tests/test_live_phase_one_unittest.py` | unit | Plan small capital only, reject aggressive risk |
 | Gold research | `tests/test_gold_research_unittest.py` | unit | Keep XAUUSD research-only |
 | AI guardrails | `tests/test_ai_guardrails_unittest.py` | unit | Block direct order/risk bypass recommendations |
+| Continuous skill roadmap | `tests/test_continuous_skill_roadmap_unittest.py` | static QA | Require learning loop, promotion rules, and no auto-live guardrail |
 | Kill switch | `tests/test_kill_switch_unittest.py` | integration | Block cycle while kill switch is active |
 | Incident drill | `tests/test_incident_drill_unittest.py` | integration | Verify exchange API down, network down, bot crash safe response |
 | Post-trade analysis | `tests/test_post_trade_unittest.py` | unit | Summarize PnL, exit reason, best/worst hour |
