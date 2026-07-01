@@ -9,6 +9,7 @@ from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
     DemoWalkthroughStep,
+    LearningDashboardPanel,
     LiveEvidencePanel,
     LocalDemoPanel,
     PaperCampaignPanel,
@@ -23,6 +24,7 @@ from trading_bot.orchestrator import (
     load_demo_walkthrough,
     load_health_summary,
     load_incident_panel,
+    load_learning_dashboard_panel,
     load_live_evidence_panel,
     load_local_demo_panel,
     load_orchestrator_status,
@@ -68,6 +70,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Paper Campaign", html)
         self.assertIn("Skill Loop", html)
         self.assertIn("Pattern Memory", html)
+        self.assertIn("Learning Dashboard", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -539,6 +542,76 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("PATTERN_MEMORY_ACTIVE", panel.status)
         self.assertEqual(1, panel.total_labels)
+
+    def test_learning_dashboard_panel_renders_evidence_score(self) -> None:
+        panel = LearningDashboardPanel(
+            report_path="work/market_data/reports/learning/learning_dashboard.json",
+            exists=True,
+            status="LEARNING_DASHBOARD_ACTIVE",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            trend_count=1,
+            promising_count=0,
+            weak_count=0,
+            volume_spike_count=1,
+            average_evidence_score=19.0,
+            live_evidence_completion_pct=50.0,
+            paper_campaign_completion_pct=40.0,
+            summary="active",
+            guardrail="Read-only research. No live execution.",
+            trends=[
+                {
+                    "symbol": "BTC/USDT",
+                    "timeframe": "15m",
+                    "observation": "WATCH_VOLUME_SPIKE",
+                    "outcome_grade": "NEEDS_MORE_TRADES",
+                    "status": "BUTUH PAPER",
+                    "evidence_score": 19.0,
+                    "volume_spike": True,
+                    "trade_count": 3,
+                    "win_rate_pct": 66.67,
+                    "total_net_pnl": 1.2,
+                    "next_action": "Lanjut paper campaign",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, learning_dashboard=panel)
+
+        self.assertIn("Learning Dashboard", html)
+        self.assertIn("LEARNING_DASHBOARD_ACTIVE", html)
+        self.assertIn("WATCH_VOLUME_SPIKE", html)
+        self.assertIn("BUTUH PAPER", html)
+
+    def test_learning_dashboard_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "learning" / "learning_dashboard.json",
+                {
+                    "status": "LEARNING_DASHBOARD_ACTIVE",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "trend_count": 1,
+                    "promising_count": 0,
+                    "weak_count": 0,
+                    "volume_spike_count": 1,
+                    "average_evidence_score": 19.0,
+                    "live_evidence_completion_pct": 50.0,
+                    "paper_campaign_completion_pct": 40.0,
+                    "summary": "active",
+                    "guardrail": "Read-only research. No live execution.",
+                    "trends": [{"symbol": "BTC/USDT", "status": "BUTUH PAPER"}],
+                },
+            )
+
+            panel = load_learning_dashboard_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("LEARNING_DASHBOARD_ACTIVE", panel.status)
+        self.assertEqual(1, panel.volume_spike_count)
 
     def test_vps_demo_panel_renders_private_access_summary(self) -> None:
         panel = VpsDemoPanel(

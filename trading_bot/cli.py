@@ -55,11 +55,13 @@ from trading_bot.reports.quality import save_quality_report
 from trading_bot.reports.walk_forward import save_walk_forward_report
 from trading_bot.research import (
     ResearchDatasetCsvStore,
+    build_learning_dashboard_report,
     build_pattern_outcome_dataset,
     build_pattern_memory_report,
     build_skill_loop_report,
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
+    save_learning_dashboard_report,
     save_pattern_memory_report,
     save_skill_loop_report,
 )
@@ -117,6 +119,9 @@ def build_parser() -> argparse.ArgumentParser:
     pattern_memory.add_argument("--db-path")
     pattern_memory.add_argument("--label-path")
     pattern_memory.add_argument("--limit", type=int, default=500)
+
+    learning_dashboard = subparsers.add_parser("learning-dashboard-report")
+    learning_dashboard.add_argument("--config", default="config/bot.sample.toml")
 
     demo_data = subparsers.add_parser("seed-demo-data")
     demo_data.add_argument("--config", default="config/bot.sample.toml")
@@ -543,6 +548,30 @@ def main(argv: list[str] | None = None) -> int:
                 f"{row.symbol} {row.timeframe} observation={row.observation}, "
                 f"grade={row.outcome_grade}, trades={row.trade_count}, "
                 f"win_rate={row.win_rate_pct:.2f}, pnl={row.total_net_pnl:.8f}"
+            )
+        return 0
+
+    if args.command == "learning-dashboard-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_learning_dashboard_report(config)
+            path = save_learning_dashboard_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"learning dashboard failed: {exc}")
+            return 2
+
+        print(
+            "learning dashboard: "
+            f"status={report.status}, trends={report.trend_count}, "
+            f"promising={report.promising_count}, weak={report.weak_count}, "
+            f"avg_score={report.average_evidence_score:.2f}, path={path}"
+        )
+        for trend in report.trends[:8]:
+            print(
+                "trend: "
+                f"{trend.symbol} {trend.timeframe} observation={trend.observation}, "
+                f"grade={trend.outcome_grade}, evidence_score={trend.evidence_score:.2f}, "
+                f"status={trend.status}"
             )
         return 0
 

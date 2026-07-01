@@ -48,6 +48,7 @@ python -m trading_bot.cli db-status --config config/bot.sample.toml
 python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 python -m trading_bot.cli skill-loop-report --config config/bot.sample.toml
 python -m trading_bot.cli pattern-memory-report --config config/bot.sample.toml
+python -m trading_bot.cli learning-dashboard-report --config config/bot.sample.toml
 ```
 
 ## Data Collection

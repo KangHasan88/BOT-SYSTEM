@@ -181,6 +181,7 @@ Command:
 ```bash
 python -m trading_bot.cli skill-loop-report --config config/bot.sample.toml
 python -m trading_bot.cli pattern-memory-report --config config/bot.sample.toml
+python -m trading_bot.cli learning-dashboard-report --config config/bot.sample.toml
 ```
 
 Report:
@@ -188,6 +189,7 @@ Report:
 ```text
 work/market_data/reports/learning/skill_loop.json
 work/market_data/reports/learning/pattern_memory.json
+work/market_data/reports/learning/learning_dashboard.json
 ```
 
 ## Pattern Memory
@@ -211,6 +213,18 @@ Output grade:
 
 Pattern memory adalah bahan review dan eksperimen. Tidak boleh membuat live
 order otomatis.
+
+## Learning Dashboard
+
+Learning dashboard merangkum hasil belajar menjadi panel yang mudah dibaca:
+
+- pattern trend per symbol/timeframe;
+- outcome grade dari pattern memory;
+- volume spike flag dari learning snapshot;
+- evidence score dari jumlah paper trade, paper campaign, dan live evidence;
+- next action untuk review manual.
+
+Evidence score bukan izin live. Score hanya membantu prioritas review.
 
 ## Guardrail Summary
 

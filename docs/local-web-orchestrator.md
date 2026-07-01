@@ -239,6 +239,25 @@ Status yang sama tersedia sebagai JSON di:
 http://127.0.0.1:8000/api/pattern-memory
 ```
 
+## Learning Dashboard
+
+Panel `Learning Dashboard` membaca:
+
+```text
+work/market_data/reports/learning/learning_dashboard.json
+```
+
+Klik tombol `Learning Dashboard` setelah `Skill Loop` dan `Pattern Memory`.
+Panel ini menampilkan evidence score, status awam seperti `BUTUH PAPER`,
+volume spike, jumlah trade, win rate, P/L, dan aksi berikutnya. Score ini untuk
+prioritas review, bukan izin live.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/learning-dashboard
+```
+
 ## Setup Cepat
 
 Halaman utama punya checklist first-run untuk:

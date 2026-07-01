@@ -26,6 +26,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "skill_loop": ("skill-loop-report", "--config", "{config}"),
     "pattern_memory": ("pattern-memory-report", "--config", "{config}", "--limit", "{limit}"),
+    "learning_dashboard": ("learning-dashboard-report", "--config", "{config}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -219,6 +220,24 @@ class PatternMemoryPanel:
     summary: str
     guardrail: str
     rows: list[dict]
+
+
+@dataclass(frozen=True)
+class LearningDashboardPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    trend_count: int
+    promising_count: int
+    weak_count: int
+    volume_spike_count: int
+    average_evidence_score: float
+    live_evidence_completion_pct: float
+    paper_campaign_completion_pct: float
+    summary: str
+    guardrail: str
+    trends: list[dict]
 
 
 @dataclass(frozen=True)
@@ -529,6 +548,28 @@ def load_pattern_memory_panel(config_path: str | Path = "config/bot.sample.toml"
     )
 
 
+def load_learning_dashboard_panel(config_path: str | Path = "config/bot.sample.toml") -> LearningDashboardPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "learning" / "learning_dashboard.json"
+    payload = _read_json(path) or {}
+    return LearningDashboardPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        trend_count=int(payload.get("trend_count", 0) or 0),
+        promising_count=int(payload.get("promising_count", 0) or 0),
+        weak_count=int(payload.get("weak_count", 0) or 0),
+        volume_spike_count=int(payload.get("volume_spike_count", 0) or 0),
+        average_evidence_score=float(payload.get("average_evidence_score", 0) or 0),
+        live_evidence_completion_pct=float(payload.get("live_evidence_completion_pct", 0) or 0),
+        paper_campaign_completion_pct=float(payload.get("paper_campaign_completion_pct", 0) or 0),
+        summary=str(payload.get("summary", "Klik Learning Dashboard untuk membuat ringkasan belajar.")),
+        guardrail=str(payload.get("guardrail", "Read-only research. No live execution.")),
+        trends=list(payload.get("trends", [])) if isinstance(payload.get("trends", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -750,6 +791,7 @@ def build_orchestrator_page(
     paper_campaign: PaperCampaignPanel | None = None,
     skill_loop: SkillLoopPanel | None = None,
     pattern_memory: PatternMemoryPanel | None = None,
+    learning_dashboard: LearningDashboardPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -767,6 +809,7 @@ def build_orchestrator_page(
     paper_campaign = paper_campaign or PaperCampaignPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "", [], [])
     skill_loop = skill_loop or SkillLoopPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "MISSING", "", "Research only. No live orders.", [], [])
     pattern_memory = pattern_memory or PatternMemoryPanel("", False, "MISSING", "", 0, 0, 0, "", "Review only. No live orders.", [])
+    learning_dashboard = learning_dashboard or LearningDashboardPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, 0, 0, "", "Read-only research. No live execution.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -784,6 +827,7 @@ def build_orchestrator_page(
     paper_campaign_html = _paper_campaign_html(paper_campaign)
     skill_loop_html = _skill_loop_html(skill_loop)
     pattern_memory_html = _pattern_memory_html(pattern_memory)
+    learning_dashboard_html = _learning_dashboard_html(learning_dashboard)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -944,6 +988,11 @@ def build_orchestrator_page(
       <h2>Pattern Memory</h2>
       <div>{pattern_memory_html}</div>
       <p class="small">Memory ini membantu review pola, label manual, dan outcome paper. Bukan tombol order live.</p>
+    </section>
+    <section class="panel">
+      <h2>Learning Dashboard</h2>
+      <div>{learning_dashboard_html}</div>
+      <p class="small">Dashboard ini merangkum trend pola, volume spike, dan evidence score untuk review awam.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -1136,6 +1185,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/pattern-memory":
                     self._json_response(asdict(load_pattern_memory_panel(config_path)))
                     return
+                if parsed.path == "/api/learning-dashboard":
+                    self._json_response(asdict(load_learning_dashboard_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -1176,6 +1228,7 @@ def _handler_factory(config_path: Path):
                 paper_campaign = load_paper_campaign_panel(config_path)
                 skill_loop = load_skill_loop_panel(config_path)
                 pattern_memory = load_pattern_memory_panel(config_path)
+                learning_dashboard = load_learning_dashboard_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -1195,6 +1248,7 @@ def _handler_factory(config_path: Path):
                         paper_campaign,
                         skill_loop,
                         pattern_memory,
+                        learning_dashboard,
                         pnl,
                         walkthrough,
                     )
@@ -1762,6 +1816,46 @@ def _pattern_memory_html(panel: PatternMemoryPanel) -> str:
     )
 
 
+def _learning_dashboard_html(panel: LearningDashboardPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    rows = []
+    for trend in panel.trends:
+        trend_status = str(trend.get("status", ""))
+        volume_spike = "Ya" if bool(trend.get("volume_spike", False)) else "Tidak"
+        pnl = float(trend.get("total_net_pnl", 0) or 0)
+        pnl_css = "ok" if pnl >= 0 else "danger"
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(trend.get('symbol', '')))}</td>"
+            f"<td>{escape(str(trend.get('timeframe', '')))}</td>"
+            f"<td>{escape(str(trend.get('observation', '')))}</td>"
+            f"<td>{escape(str(trend.get('outcome_grade', '')))}</td>"
+            f'<td><span class="badge {_report_status_class(trend_status)}">{escape(trend_status)}</span></td>'
+            f"<td>{float(trend.get('evidence_score', 0) or 0):.2f}</td>"
+            f"<td>{volume_spike}</td>"
+            f"<td>{int(trend.get('trade_count', 0) or 0)}</td>"
+            f"<td>{float(trend.get('win_rate_pct', 0) or 0):.2f}%</td>"
+            f'<td><span class="badge {pnl_css}">{pnl:.8f}</span></td>'
+            f"<td>{escape(str(trend.get('next_action', '')))}</td>"
+            "</tr>"
+        )
+    table_rows = "".join(rows) if rows else '<tr><td colspan="11">Belum ada report. Klik Learning Dashboard.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Dashboard", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Trend", panel.trend_count)
+        + _metric("Promising", panel.promising_count)
+        + _metric("Perlu Review", panel.weak_count)
+        + _metric("Volume Spike", panel.volume_spike_count)
+        + _metric("Avg Evidence Score", f"{panel.average_evidence_score:.2f}")
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Symbol</th><th>TF</th><th>Observation</th><th>Grade</th><th>Status</th><th>Score</th><th>Volume Spike</th><th>Trades</th><th>Win Rate</th><th>P/L</th><th>Aksi Berikut</th></tr></thead>"
+        + f"<tbody>{table_rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -2139,6 +2233,8 @@ def _action_label(action: str) -> str:
         "import_runtime_db": "Import DB",
         "db_learning_report": "Learning DB",
         "skill_loop": "Skill Loop",
+        "pattern_memory": "Pattern Memory",
+        "learning_dashboard": "Learning Dashboard",
         "build_dashboard": "Buat Dashboard",
         "security_qa": "Security QA",
         "production_smoke": "Production Smoke",
