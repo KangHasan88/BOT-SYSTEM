@@ -13,7 +13,7 @@ from trading_bot.data_collector.context_store import MarketContextCsvStore
 from trading_bot.data_collector.csv_store import CandleCsvStore
 from trading_bot.data_collector.service import MarketDataCollector
 from trading_bot.demo import seed_demo_data_pack
-from trading_bot.execution import ExchangeOrderRequest, SandboxExchangeAdapter
+from trading_bot.execution import ExchangeOrderRequest, SandboxExchangeAdapter, run_testnet_demo_report, save_testnet_demo_report
 from trading_bot.feature_engine import FeatureCsvStore, RegimeCsvStore, build_features, classify_regimes
 from trading_bot.live import LivePhaseOneConfig, build_live_phase_one_plan
 from trading_bot.markets import build_gold_research_plan
@@ -255,6 +255,10 @@ def build_parser() -> argparse.ArgumentParser:
     sandbox_order.add_argument("--order-type", choices=["market", "limit"], default="market")
     sandbox_order.add_argument("--quantity", type=float, required=True)
     sandbox_order.add_argument("--price", type=float)
+
+    testnet_demo = subparsers.add_parser("testnet-demo-report")
+    testnet_demo.add_argument("--config", default="config/bot.sample.toml")
+    testnet_demo.add_argument("--environment", choices=["sandbox", "testnet"], default="testnet")
 
     cycle = subparsers.add_parser("run-cycle")
     cycle.add_argument("--config", default="config/bot.sample.toml")
@@ -1022,6 +1026,22 @@ def main(argv: list[str] | None = None) -> int:
             f"status={order.status}, symbol={order.symbol}, side={order.side}, quantity={order.quantity}"
         )
         return 0
+
+    if args.command == "testnet-demo-report":
+        try:
+            config = load_config(Path(args.config))
+            report = run_testnet_demo_report(args.environment)
+            path = save_testnet_demo_report(report, config.data_root)
+        except (ConfigError, ValueError) as exc:
+            print(f"testnet demo failed: {exc}")
+            return 2
+
+        print(
+            "testnet demo: "
+            f"status={report.status}, environment={report.environment}, "
+            f"orders={len(report.orders)}, live_guard={report.live_guard_status}, path={path}"
+        )
+        return 0 if report.status == "PASSED" else 2
 
     if args.command == "run-cycle":
         try:

@@ -27,6 +27,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
     "incident_drill": ("incident-drill-report", "--config", "{config}"),
     "live_go_no_go": ("live-go-no-go-report", "--config", "{config}"),
+    "testnet_demo": ("testnet-demo-report", "--config", "{config}", "--environment", "testnet"),
     "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
     "sync_eth_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "ETH/USDT", "--timeframe", "15m", "--limit", "{limit}"),
@@ -206,6 +207,7 @@ def load_report_browser(config_path: str | Path = "config/bot.sample.toml") -> l
     reports.extend(_paper_report_items(root / "paper"))
     reports.extend(_json_report_items(root / "reports" / "daily", "Daily Journal", "*.json"))
     reports.extend(_json_report_items(root / "reports" / "learning", "Learning", "*.json"))
+    reports.extend(_json_report_items(root / "execution" / "testnet_demo", "Testnet Demo", "*.json"))
     return sorted(reports, key=lambda item: item.updated_at_utc, reverse=True)
 
 
@@ -766,7 +768,7 @@ def _action_icon(action: str) -> str:
         return _svg_icon("refresh")
     if "demo" in action:
         return _svg_icon("database")
-    if "security" in action or "go_no_go" in action or "incident" in action:
+    if "security" in action or "go_no_go" in action or "incident" in action or "testnet" in action:
         return _svg_icon("shield")
     if "dashboard" in action:
         return _svg_icon("chart")
@@ -1077,6 +1079,7 @@ def _action_label(action: str) -> str:
         "production_smoke": "Production Smoke",
         "incident_drill": "Incident Drill",
         "live_go_no_go": "Live Go/No-Go",
+        "testnet_demo": "Testnet Demo",
         "run_cycle": "Jalankan Siklus",
         "sync_btc_15m": "Sinkron BTC 15m",
         "sync_eth_15m": "Sinkron ETH 15m",

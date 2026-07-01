@@ -19,7 +19,14 @@ real-money live account.
 python -m trading_bot.cli seed-demo-data --config config/bot.sample.toml
 python -m trading_bot.cli import-runtime-db --config config/bot.sample.toml
 python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
+python -m trading_bot.cli testnet-demo-report --config config/bot.sample.toml --environment testnet
 python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
+```
+
+`testnet-demo-report` membuat laporan di:
+
+```text
+work/market_data/execution/testnet_demo/report.json
 ```
 
 ## Guard

@@ -123,6 +123,13 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 
 Live phase one is only a plan in v1. It does not route live orders.
 
+Demo account / testnet flow:
+
+```bash
+python -m trading_bot.cli testnet-demo-report --config config/bot.sample.toml --environment testnet
+python -m trading_bot.cli sandbox-order --environment sandbox --symbol BTC/USDT --side buy --order-type market --quantity 0.001
+```
+
 ## Kill Switch
 
 ```bash
