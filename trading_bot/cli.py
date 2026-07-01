@@ -56,8 +56,10 @@ from trading_bot.reports.walk_forward import save_walk_forward_report
 from trading_bot.research import (
     ResearchDatasetCsvStore,
     build_pattern_outcome_dataset,
+    build_skill_loop_report,
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
+    save_skill_loop_report,
 )
 from trading_bot.readiness import evaluate_live_evidence, evaluate_live_readiness, save_live_evidence_report, save_live_readiness_report
 from trading_bot.scheduler import is_entry_allowed_at_ms
@@ -104,6 +106,9 @@ def build_parser() -> argparse.ArgumentParser:
     db_learning.add_argument("--config", default="config/bot.sample.toml")
     db_learning.add_argument("--db-path")
     db_learning.add_argument("--limit", type=int, default=500)
+
+    skill_loop = subparsers.add_parser("skill-loop-report")
+    skill_loop.add_argument("--config", default="config/bot.sample.toml")
 
     demo_data = subparsers.add_parser("seed-demo-data")
     demo_data.add_argument("--config", default="config/bot.sample.toml")
@@ -484,6 +489,25 @@ def main(argv: list[str] | None = None) -> int:
         )
         for note in snapshot.notes:
             print(f"note: {note}")
+        return 0
+
+    if args.command == "skill-loop-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_skill_loop_report(config)
+            path = save_skill_loop_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"skill loop failed: {exc}")
+            return 2
+
+        print(
+            "skill loop: "
+            f"status={report.status}, candles={report.candle_rows}, "
+            f"paper_trades={report.paper_trades}, learning_rows={report.learning_rows}, "
+            f"evidence_completion={report.evidence_completion_pct:.2f}, path={path}"
+        )
+        for candidate in report.experiment_candidates[:5]:
+            print(f"candidate: {candidate}")
         return 0
 
     if args.command == "seed-demo-data":

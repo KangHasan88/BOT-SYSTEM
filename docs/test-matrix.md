@@ -69,6 +69,7 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | Security QA | `tests/test_security_qa_unittest.py` | integration | Report env guard, secret scan, live block, withdrawal disabled |
 | Observability | `tests/test_observability_unittest.py` | integration | Write/read audit events and cycle activity |
 | Research dataset | `tests/test_research_dataset_unittest.py` | unit | Label pattern outcome and export dataset |
+| Skill loop | `tests/test_skill_loop_unittest.py` | unit | Summarize learning loop without auto-live execution |
 | Walk-forward | `tests/test_walk_forward_unittest.py` | integration | Split train/test and gate out-of-sample results |
 | Live readiness | `tests/test_live_readiness_unittest.py` | unit | Block live when evidence is missing |
 | Live go/no-go | `tests/test_live_go_no_go_unittest.py` | integration | Aggregate QA evidence and owner approval before live review |

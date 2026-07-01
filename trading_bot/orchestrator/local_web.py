@@ -24,6 +24,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "vps_demo": ("vps-demo-report", "--config", "{config}"),
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
+    "skill_loop": ("skill-loop-report", "--config", "{config}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -185,6 +186,24 @@ class PaperCampaignPanel:
     summary: str
     blockers: list[str]
     pairs: list[dict]
+
+
+@dataclass(frozen=True)
+class SkillLoopPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    candle_rows: int
+    paper_trades: int
+    paper_net_pnl: float
+    learning_rows: int
+    evidence_completion_pct: float
+    paper_campaign_status: str
+    summary: str
+    guardrail: str
+    experiment_candidates: list[str]
+    steps: list[dict]
 
 
 @dataclass(frozen=True)
@@ -455,6 +474,28 @@ def load_vps_demo_panel(config_path: str | Path = "config/bot.sample.toml") -> V
     )
 
 
+def load_skill_loop_panel(config_path: str | Path = "config/bot.sample.toml") -> SkillLoopPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "learning" / "skill_loop.json"
+    payload = _read_json(path) or {}
+    return SkillLoopPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        candle_rows=int(payload.get("candle_rows", 0) or 0),
+        paper_trades=int(payload.get("paper_trades", 0) or 0),
+        paper_net_pnl=float(payload.get("paper_net_pnl", 0) or 0),
+        learning_rows=int(payload.get("learning_rows", 0) or 0),
+        evidence_completion_pct=float(payload.get("evidence_completion_pct", 0) or 0),
+        paper_campaign_status=str(payload.get("paper_campaign_status", "MISSING")),
+        summary=str(payload.get("summary", "Klik Skill Loop untuk membuat report pembelajaran.")),
+        guardrail=str(payload.get("guardrail", "Research only. No live orders.")),
+        experiment_candidates=list(payload.get("experiment_candidates", [])) if isinstance(payload.get("experiment_candidates", []), list) else [],
+        steps=list(payload.get("steps", [])) if isinstance(payload.get("steps", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -674,6 +715,7 @@ def build_orchestrator_page(
     local_demo: LocalDemoPanel | None = None,
     vps_demo: VpsDemoPanel | None = None,
     paper_campaign: PaperCampaignPanel | None = None,
+    skill_loop: SkillLoopPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -689,6 +731,7 @@ def build_orchestrator_page(
     local_demo = local_demo or LocalDemoPanel("", False, "MISSING", "", 0, 0, 0, False, "", [])
     vps_demo = vps_demo or VpsDemoPanel("", False, "MISSING", "", "", "", "", False, "", [])
     paper_campaign = paper_campaign or PaperCampaignPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "", [], [])
+    skill_loop = skill_loop or SkillLoopPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "MISSING", "", "Research only. No live orders.", [], [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -704,6 +747,7 @@ def build_orchestrator_page(
     local_demo_html = _local_demo_html(local_demo)
     vps_demo_html = _vps_demo_html(vps_demo)
     paper_campaign_html = _paper_campaign_html(paper_campaign)
+    skill_loop_html = _skill_loop_html(skill_loop)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -854,6 +898,11 @@ def build_orchestrator_page(
       <h2>Paper Campaign</h2>
       <div>{paper_campaign_html}</div>
       <p class="small">Target campaign: minimal 14 hari, ideal 28 hari, dan minimal 20 paper trades sebelum live review.</p>
+    </section>
+    <section class="panel">
+      <h2>Skill Loop</h2>
+      <div>{skill_loop_html}</div>
+      <p class="small">Loop ini hanya untuk riset dan improvement. Tidak ada auto-live dari hasil belajar.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -1040,6 +1089,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/paper-campaign":
                     self._json_response(asdict(load_paper_campaign_panel(config_path)))
                     return
+                if parsed.path == "/api/skill-loop":
+                    self._json_response(asdict(load_skill_loop_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -1078,6 +1130,7 @@ def _handler_factory(config_path: Path):
                 local_demo = load_local_demo_panel(config_path)
                 vps_demo = load_vps_demo_panel(config_path)
                 paper_campaign = load_paper_campaign_panel(config_path)
+                skill_loop = load_skill_loop_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -1095,6 +1148,7 @@ def _handler_factory(config_path: Path):
                         local_demo,
                         vps_demo,
                         paper_campaign,
+                        skill_loop,
                         pnl,
                         walkthrough,
                     )
@@ -1590,6 +1644,41 @@ def _paper_campaign_html(panel: PaperCampaignPanel) -> str:
     )
 
 
+def _skill_loop_html(panel: SkillLoopPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    pnl_css = "ok" if panel.paper_net_pnl >= 0 else "danger"
+    step_rows = []
+    for step in panel.steps:
+        status = str(step.get("status", ""))
+        step_rows.append(
+            "<tr>"
+            f"<td>{escape(str(step.get('name', '')))}</td>"
+            f'<td><span class="badge {_report_status_class(status)}">{escape(status)}</span></td>'
+            f"<td>{escape(str(step.get('metric', '')))}</td>"
+            f"<td>{escape(str(step.get('finding', '')))}</td>"
+            f"<td>{escape(str(step.get('next_action', '')))}</td>"
+            "</tr>"
+        )
+    rows = "".join(step_rows) if step_rows else '<tr><td colspan="5">Belum ada report. Klik Skill Loop.</td></tr>'
+    candidates = "".join(f"<li>{escape(str(candidate))}</li>" for candidate in panel.experiment_candidates[:6])
+    candidate_html = f"<ul>{candidates}</ul>" if candidates else '<p class="small">Belum ada kandidat eksperimen.</p>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Skill Loop", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Candles", panel.candle_rows)
+        + _metric("Paper Trades", panel.paper_trades)
+        + _metric("Paper Net P/L", f'<span class="badge {pnl_css}">{panel.paper_net_pnl:.8f}</span>')
+        + _metric("Learning Rows", panel.learning_rows)
+        + _metric("Evidence", f"{panel.evidence_completion_pct:.2f}%")
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + candidate_html
+        + '<table class="data-table">'
+        + "<thead><tr><th>Step</th><th>Status</th><th>Metric</th><th>Finding</th><th>Aksi Berikut</th></tr></thead>"
+        + f"<tbody>{rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -1966,6 +2055,7 @@ def _action_label(action: str) -> str:
         "vps_demo": "VPS Demo",
         "import_runtime_db": "Import DB",
         "db_learning_report": "Learning DB",
+        "skill_loop": "Skill Loop",
         "build_dashboard": "Buat Dashboard",
         "security_qa": "Security QA",
         "production_smoke": "Production Smoke",

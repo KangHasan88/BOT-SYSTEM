@@ -55,6 +55,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-local-orc
 - VPS Demo readiness untuk cek jalur private VPS paper mode;
 - Import DB SQLite lokal;
 - Learning DB dari SQLite lokal;
+- Skill Loop untuk review pembelajaran dan kandidat eksperimen;
 - Buat Dashboard statis;
 - Security QA;
 - Production Smoke;
@@ -199,6 +200,24 @@ Status yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/paper-campaign
+```
+
+## Skill Loop
+
+Panel `Skill Loop` membaca:
+
+```text
+work/market_data/reports/learning/skill_loop.json
+```
+
+Klik tombol `Skill Loop` untuk membuat ringkasan loop belajar: capture data,
+baca pola, review trade, paper campaign, evidence gate, dan kandidat eksperimen
+berikutnya. Output ini hanya research/readiness, bukan sinyal live order.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/skill-loop
 ```
 
 ## Setup Cepat

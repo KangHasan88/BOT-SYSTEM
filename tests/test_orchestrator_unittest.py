@@ -12,6 +12,7 @@ from trading_bot.orchestrator import (
     LiveEvidencePanel,
     LocalDemoPanel,
     PaperCampaignPanel,
+    SkillLoopPanel,
     PnlPanel,
     PnlTradeRow,
     TestnetDemoPanel,
@@ -25,6 +26,7 @@ from trading_bot.orchestrator import (
     load_local_demo_panel,
     load_orchestrator_status,
     load_paper_campaign_panel,
+    load_skill_loop_panel,
     load_pnl_panel,
     load_report_browser,
     load_setup_wizard,
@@ -62,6 +64,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Local Demo Readiness", html)
         self.assertIn("Private VPS Demo", html)
         self.assertIn("Paper Campaign", html)
+        self.assertIn("Skill Loop", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -417,6 +420,62 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("PAPER_CAMPAIGN_READY", panel.status)
         self.assertEqual(20, panel.total_trade_count)
+
+    def test_skill_loop_panel_renders_learning_summary(self) -> None:
+        panel = SkillLoopPanel(
+            report_path="work/market_data/reports/learning/skill_loop.json",
+            exists=True,
+            status="SKILL_LOOP_ACTIVE",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            candle_rows=3000,
+            paper_trades=19,
+            paper_net_pnl=187.6,
+            learning_rows=6,
+            evidence_completion_pct=53.0,
+            paper_campaign_status="PAPER_CAMPAIGN_COLLECTING",
+            summary="skill loop active",
+            guardrail="Research only. No live orders.",
+            experiment_candidates=["Review pattern note: WATCH_VOLUME_SPIKE"],
+            steps=[{"name": "capture_data", "status": "PASS", "metric": "candles=3000", "finding": "market data tersedia", "next_action": ""}],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, skill_loop=panel)
+
+        self.assertIn("Skill Loop", html)
+        self.assertIn("SKILL_LOOP_ACTIVE", html)
+        self.assertIn("WATCH_VOLUME_SPIKE", html)
+        self.assertIn("No live orders", html)
+
+    def test_skill_loop_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "learning" / "skill_loop.json",
+                {
+                    "status": "SKILL_LOOP_ACTIVE",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "candle_rows": 80,
+                    "paper_trades": 1,
+                    "paper_net_pnl": 1.0,
+                    "learning_rows": 1,
+                    "evidence_completion_pct": 50.0,
+                    "paper_campaign_status": "PAPER_CAMPAIGN_COLLECTING",
+                    "summary": "active",
+                    "guardrail": "Research only. No live orders.",
+                    "experiment_candidates": ["review"],
+                    "steps": [{"name": "capture_data", "status": "PASS"}],
+                },
+            )
+
+            panel = load_skill_loop_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("SKILL_LOOP_ACTIVE", panel.status)
+        self.assertEqual(1, panel.learning_rows)
 
     def test_vps_demo_panel_renders_private_access_summary(self) -> None:
         panel = VpsDemoPanel(

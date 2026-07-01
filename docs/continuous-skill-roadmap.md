@@ -176,6 +176,18 @@ Setiap minggu, bot harus bisa menghasilkan ringkasan:
 - strategi yang harus dipause;
 - evidence yang masih kurang sebelum live review.
 
+Command:
+
+```bash
+python -m trading_bot.cli skill-loop-report --config config/bot.sample.toml
+```
+
+Report:
+
+```text
+work/market_data/reports/learning/skill_loop.json
+```
+
 ## Guardrail Summary
 
 Bot boleh belajar terus, tetapi live execution adalah privilege yang dibuka
