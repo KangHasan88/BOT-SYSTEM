@@ -12,6 +12,7 @@ from trading_bot.orchestrator import (
     LiveEvidencePanel,
     LocalDemoPanel,
     PaperCampaignPanel,
+    PatternMemoryPanel,
     SkillLoopPanel,
     PnlPanel,
     PnlTradeRow,
@@ -26,6 +27,7 @@ from trading_bot.orchestrator import (
     load_local_demo_panel,
     load_orchestrator_status,
     load_paper_campaign_panel,
+    load_pattern_memory_panel,
     load_skill_loop_panel,
     load_pnl_panel,
     load_report_browser,
@@ -65,6 +67,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Private VPS Demo", html)
         self.assertIn("Paper Campaign", html)
         self.assertIn("Skill Loop", html)
+        self.assertIn("Pattern Memory", html)
         self.assertIn("Cek Keamanan", html)
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
@@ -476,6 +479,66 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("SKILL_LOOP_ACTIVE", panel.status)
         self.assertEqual(1, panel.learning_rows)
+
+    def test_pattern_memory_panel_renders_outcome_summary(self) -> None:
+        panel = PatternMemoryPanel(
+            report_path="work/market_data/reports/learning/pattern_memory.json",
+            exists=True,
+            status="PATTERN_MEMORY_ACTIVE",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            row_count=1,
+            total_trades=2,
+            total_labels=1,
+            summary="pattern memory active",
+            guardrail="Review only. No live orders.",
+            rows=[
+                {
+                    "symbol": "BTC/USDT",
+                    "timeframe": "15m",
+                    "observation": "WATCH_VOLUME_SPIKE",
+                    "outcome_grade": "NEEDS_MORE_TRADES",
+                    "trade_count": 2,
+                    "win_rate_pct": 50.0,
+                    "total_net_pnl": 0.08,
+                    "labels": ["good_retest_after_sweep"],
+                    "next_action": "Lanjutkan paper campaign",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, pattern_memory=panel)
+
+        self.assertIn("Pattern Memory", html)
+        self.assertIn("PATTERN_MEMORY_ACTIVE", html)
+        self.assertIn("WATCH_VOLUME_SPIKE", html)
+        self.assertIn("good_retest_after_sweep", html)
+
+    def test_pattern_memory_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "learning" / "pattern_memory.json",
+                {
+                    "status": "PATTERN_MEMORY_ACTIVE",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "row_count": 1,
+                    "total_trades": 2,
+                    "total_labels": 1,
+                    "summary": "active",
+                    "guardrail": "Review only. No live orders.",
+                    "rows": [{"symbol": "BTC/USDT", "timeframe": "15m", "outcome_grade": "NEEDS_MORE_TRADES"}],
+                },
+            )
+
+            panel = load_pattern_memory_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("PATTERN_MEMORY_ACTIVE", panel.status)
+        self.assertEqual(1, panel.total_labels)
 
     def test_vps_demo_panel_renders_private_access_summary(self) -> None:
         panel = VpsDemoPanel(

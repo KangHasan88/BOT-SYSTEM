@@ -220,6 +220,25 @@ Status yang sama tersedia sebagai JSON di:
 http://127.0.0.1:8000/api/skill-loop
 ```
 
+## Pattern Memory
+
+Panel `Pattern Memory` membaca:
+
+```text
+work/market_data/reports/learning/pattern_memory.json
+```
+
+Klik tombol `Pattern Memory` setelah `Import DB` dan `Learning DB`. Panel ini
+menampilkan observation, grade outcome, jumlah paper trade, win rate, P/L,
+label manual, dan aksi review berikutnya. Tujuannya agar pola yang terlihat
+bagus tetap diuji dulu, bukan langsung masuk live.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/pattern-memory
+```
+
 ## Setup Cepat
 
 Halaman utama punya checklist first-run untuk:

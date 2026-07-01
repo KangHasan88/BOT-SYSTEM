@@ -56,9 +56,11 @@ from trading_bot.reports.walk_forward import save_walk_forward_report
 from trading_bot.research import (
     ResearchDatasetCsvStore,
     build_pattern_outcome_dataset,
+    build_pattern_memory_report,
     build_skill_loop_report,
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
+    save_pattern_memory_report,
     save_skill_loop_report,
 )
 from trading_bot.readiness import evaluate_live_evidence, evaluate_live_readiness, save_live_evidence_report, save_live_readiness_report
@@ -109,6 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     skill_loop = subparsers.add_parser("skill-loop-report")
     skill_loop.add_argument("--config", default="config/bot.sample.toml")
+
+    pattern_memory = subparsers.add_parser("pattern-memory-report")
+    pattern_memory.add_argument("--config", default="config/bot.sample.toml")
+    pattern_memory.add_argument("--db-path")
+    pattern_memory.add_argument("--label-path")
+    pattern_memory.add_argument("--limit", type=int, default=500)
 
     demo_data = subparsers.add_parser("seed-demo-data")
     demo_data.add_argument("--config", default="config/bot.sample.toml")
@@ -508,6 +516,34 @@ def main(argv: list[str] | None = None) -> int:
         )
         for candidate in report.experiment_candidates[:5]:
             print(f"candidate: {candidate}")
+        return 0
+
+    if args.command == "pattern-memory-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_pattern_memory_report(
+                config,
+                db_path=args.db_path,
+                label_path=args.label_path,
+                limit=args.limit,
+            )
+            path = save_pattern_memory_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"pattern memory failed: {exc}")
+            return 2
+
+        print(
+            "pattern memory: "
+            f"status={report.status}, rows={report.row_count}, trades={report.total_trades}, "
+            f"labels={report.total_labels}, path={path}"
+        )
+        for row in report.rows[:8]:
+            print(
+                "memory: "
+                f"{row.symbol} {row.timeframe} observation={row.observation}, "
+                f"grade={row.outcome_grade}, trades={row.trade_count}, "
+                f"win_rate={row.win_rate_pct:.2f}, pnl={row.total_net_pnl:.8f}"
+            )
         return 0
 
     if args.command == "seed-demo-data":

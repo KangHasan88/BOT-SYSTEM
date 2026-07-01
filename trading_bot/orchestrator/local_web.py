@@ -25,6 +25,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "import_runtime_db": ("import-runtime-db", "--config", "{config}"),
     "db_learning_report": ("db-learning-report", "--config", "{config}", "--limit", "{limit}"),
     "skill_loop": ("skill-loop-report", "--config", "{config}"),
+    "pattern_memory": ("pattern-memory-report", "--config", "{config}", "--limit", "{limit}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -204,6 +205,20 @@ class SkillLoopPanel:
     guardrail: str
     experiment_candidates: list[str]
     steps: list[dict]
+
+
+@dataclass(frozen=True)
+class PatternMemoryPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    row_count: int
+    total_trades: int
+    total_labels: int
+    summary: str
+    guardrail: str
+    rows: list[dict]
 
 
 @dataclass(frozen=True)
@@ -496,6 +511,24 @@ def load_skill_loop_panel(config_path: str | Path = "config/bot.sample.toml") ->
     )
 
 
+def load_pattern_memory_panel(config_path: str | Path = "config/bot.sample.toml") -> PatternMemoryPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "learning" / "pattern_memory.json"
+    payload = _read_json(path) or {}
+    return PatternMemoryPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        row_count=int(payload.get("row_count", 0) or 0),
+        total_trades=int(payload.get("total_trades", 0) or 0),
+        total_labels=int(payload.get("total_labels", 0) or 0),
+        summary=str(payload.get("summary", "Klik Pattern Memory untuk membuat review outcome pola.")),
+        guardrail=str(payload.get("guardrail", "Review only. No live orders.")),
+        rows=list(payload.get("rows", [])) if isinstance(payload.get("rows", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -716,6 +749,7 @@ def build_orchestrator_page(
     vps_demo: VpsDemoPanel | None = None,
     paper_campaign: PaperCampaignPanel | None = None,
     skill_loop: SkillLoopPanel | None = None,
+    pattern_memory: PatternMemoryPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -732,6 +766,7 @@ def build_orchestrator_page(
     vps_demo = vps_demo or VpsDemoPanel("", False, "MISSING", "", "", "", "", False, "", [])
     paper_campaign = paper_campaign or PaperCampaignPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "", [], [])
     skill_loop = skill_loop or SkillLoopPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "MISSING", "", "Research only. No live orders.", [], [])
+    pattern_memory = pattern_memory or PatternMemoryPanel("", False, "MISSING", "", 0, 0, 0, "", "Review only. No live orders.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -748,6 +783,7 @@ def build_orchestrator_page(
     vps_demo_html = _vps_demo_html(vps_demo)
     paper_campaign_html = _paper_campaign_html(paper_campaign)
     skill_loop_html = _skill_loop_html(skill_loop)
+    pattern_memory_html = _pattern_memory_html(pattern_memory)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -903,6 +939,11 @@ def build_orchestrator_page(
       <h2>Skill Loop</h2>
       <div>{skill_loop_html}</div>
       <p class="small">Loop ini hanya untuk riset dan improvement. Tidak ada auto-live dari hasil belajar.</p>
+    </section>
+    <section class="panel">
+      <h2>Pattern Memory</h2>
+      <div>{pattern_memory_html}</div>
+      <p class="small">Memory ini membantu review pola, label manual, dan outcome paper. Bukan tombol order live.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -1092,6 +1133,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/skill-loop":
                     self._json_response(asdict(load_skill_loop_panel(config_path)))
                     return
+                if parsed.path == "/api/pattern-memory":
+                    self._json_response(asdict(load_pattern_memory_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -1131,6 +1175,7 @@ def _handler_factory(config_path: Path):
                 vps_demo = load_vps_demo_panel(config_path)
                 paper_campaign = load_paper_campaign_panel(config_path)
                 skill_loop = load_skill_loop_panel(config_path)
+                pattern_memory = load_pattern_memory_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -1149,6 +1194,7 @@ def _handler_factory(config_path: Path):
                         vps_demo,
                         paper_campaign,
                         skill_loop,
+                        pattern_memory,
                         pnl,
                         walkthrough,
                     )
@@ -1679,6 +1725,43 @@ def _skill_loop_html(panel: SkillLoopPanel) -> str:
     )
 
 
+def _pattern_memory_html(panel: PatternMemoryPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    table_rows = []
+    for row in panel.rows:
+        grade = str(row.get("outcome_grade", ""))
+        labels = row.get("labels", [])
+        label_text = ", ".join(str(label) for label in labels) if isinstance(labels, list) else str(labels)
+        pnl = float(row.get("total_net_pnl", 0) or 0)
+        table_rows.append(
+            "<tr>"
+            f"<td>{escape(str(row.get('symbol', '')))}</td>"
+            f"<td>{escape(str(row.get('timeframe', '')))}</td>"
+            f"<td>{escape(str(row.get('observation', '')))}</td>"
+            f'<td><span class="badge {_report_status_class(grade)}">{escape(grade)}</span></td>'
+            f"<td>{int(row.get('trade_count', 0) or 0)}</td>"
+            f"<td>{float(row.get('win_rate_pct', 0) or 0):.2f}%</td>"
+            f"<td>{pnl:.8f}</td>"
+            f"<td>{escape(label_text or '-')}</td>"
+            f"<td>{escape(str(row.get('next_action', '')))}</td>"
+            "</tr>"
+        )
+    rows = "".join(table_rows) if table_rows else '<tr><td colspan="9">Belum ada report. Klik Pattern Memory.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Memory", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Rows", panel.row_count)
+        + _metric("Trades", panel.total_trades)
+        + _metric("Manual Labels", panel.total_labels)
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Symbol</th><th>TF</th><th>Observation</th><th>Grade</th><th>Trades</th><th>Win Rate</th><th>P/L</th><th>Labels</th><th>Aksi Berikut</th></tr></thead>"
+        + f"<tbody>{rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -2006,9 +2089,9 @@ def _report_summary(payload: dict) -> str:
 
 def _report_status_class(status: str) -> str:
     normalized = status.upper()
-    if normalized in {"REJECT", "NO_GO", "BLOCKED", "FAILED", "REVIEW_REQUIRED", "INVALID"}:
+    if normalized in {"REJECT", "NO_GO", "BLOCKED", "FAILED", "REVIEW_REQUIRED", "INVALID", "WEAK"}:
         return "danger"
-    if normalized in {"NOT_ENOUGH_DATA", "NEEDS_FILTER", "NO_DATA", "EMPTY", "MISSING"}:
+    if normalized in {"NOT_ENOUGH_DATA", "NEEDS_FILTER", "NO_DATA", "EMPTY", "MISSING", "NO_TRADES", "NEEDS_MORE_TRADES", "MIXED"}:
         return "warn"
     return "ok"
 

@@ -180,13 +180,37 @@ Command:
 
 ```bash
 python -m trading_bot.cli skill-loop-report --config config/bot.sample.toml
+python -m trading_bot.cli pattern-memory-report --config config/bot.sample.toml
 ```
 
 Report:
 
 ```text
 work/market_data/reports/learning/skill_loop.json
+work/market_data/reports/learning/pattern_memory.json
 ```
+
+## Pattern Memory
+
+Pattern memory menghubungkan observation, label manual, dan outcome paper trade
+per symbol/timeframe. Tujuannya sederhana: membantu user membaca apakah pola
+masih butuh bukti, lemah, campuran, atau mulai menjanjikan.
+
+Label manual disimpan di:
+
+```text
+work/market_data/reports/learning/manual_labels.json
+```
+
+Output grade:
+
+- `NO_TRADES`: pola belum punya paper outcome;
+- `NEEDS_MORE_TRADES`: belum cukup 20 paper trade;
+- `PROMISING`: paper P/L positif dan win rate cukup;
+- `MIXED` atau `WEAK`: wajib review filter sebelum eksperimen lanjut.
+
+Pattern memory adalah bahan review dan eksperimen. Tidak boleh membuat live
+order otomatis.
 
 ## Guardrail Summary
 
