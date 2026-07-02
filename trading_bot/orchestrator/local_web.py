@@ -28,6 +28,8 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "pattern_memory": ("pattern-memory-report", "--config", "{config}", "--limit", "{limit}"),
     "learning_dashboard": ("learning-dashboard-report", "--config", "{config}"),
     "human_feedback": ("human-feedback-report", "--config", "{config}"),
+    "fundamental": ("fundamental-report", "--config", "{config}"),
+    "experiment_scoreboard": ("experiment-scoreboard", "--config", "{config}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -265,6 +267,38 @@ class HumanFeedbackPanel:
     label_counts: dict[str, int]
     recent_labels: list[dict]
     lessons: list[dict]
+
+
+@dataclass(frozen=True)
+class FundamentalPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    event_path: str
+    total_events: int
+    high_or_block_events: int
+    top_risk: str
+    color: str
+    summary: str
+    guardrail: str
+    risk_counts: dict[str, int]
+    category_counts: dict[str, int]
+    events: list[dict]
+
+
+@dataclass(frozen=True)
+class ExperimentScoreboardPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    registry_path: str
+    experiment_count: int
+    top_strategy: str
+    summary: str
+    guardrail: str
+    rows: list[dict]
 
 
 @dataclass(frozen=True)
@@ -634,6 +668,46 @@ def load_human_feedback_panel(config_path: str | Path = "config/bot.sample.toml"
     )
 
 
+def load_fundamental_panel(config_path: str | Path = "config/bot.sample.toml") -> FundamentalPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "fundamental" / "report.json"
+    payload = _read_json(path) or {}
+    return FundamentalPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        event_path=str(payload.get("event_path", Path(config.data_root) / "reports" / "fundamental" / "events.json")),
+        total_events=int(payload.get("total_events", 0) or 0),
+        high_or_block_events=int(payload.get("high_or_block_events", 0) or 0),
+        top_risk=str(payload.get("top_risk", "LOW")),
+        color=str(payload.get("color", "green")),
+        summary=str(payload.get("summary", "Klik Fundamental untuk refresh event lane.")),
+        guardrail=str(payload.get("guardrail", "Fundamental lane is review-only. No live orders.")),
+        risk_counts=dict(payload.get("risk_counts", {})) if isinstance(payload.get("risk_counts", {}), dict) else {},
+        category_counts=dict(payload.get("category_counts", {})) if isinstance(payload.get("category_counts", {}), dict) else {},
+        events=list(payload.get("events", [])) if isinstance(payload.get("events", []), list) else [],
+    )
+
+
+def load_experiment_scoreboard_panel(config_path: str | Path = "config/bot.sample.toml") -> ExperimentScoreboardPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "learning" / "experiment_scoreboard.json"
+    payload = _read_json(path) or {}
+    return ExperimentScoreboardPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        registry_path=str(payload.get("registry_path", Path(config.data_root) / "reports" / "learning" / "strategy_experiments.json")),
+        experiment_count=int(payload.get("experiment_count", 0) or 0),
+        top_strategy=str(payload.get("top_strategy", "-")),
+        summary=str(payload.get("summary", "Klik Experiment Scoreboard untuk refresh registry eksperimen.")),
+        guardrail=str(payload.get("guardrail", "Experiment registry is review-only. No live orders.")),
+        rows=list(payload.get("rows", [])) if isinstance(payload.get("rows", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -858,6 +932,8 @@ def build_orchestrator_page(
     pattern_memory: PatternMemoryPanel | None = None,
     learning_dashboard: LearningDashboardPanel | None = None,
     human_feedback: HumanFeedbackPanel | None = None,
+    fundamental: FundamentalPanel | None = None,
+    experiment_scoreboard: ExperimentScoreboardPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -878,6 +954,8 @@ def build_orchestrator_page(
     pattern_memory = pattern_memory or PatternMemoryPanel("", False, "MISSING", "", 0, 0, 0, "", "Review only. No live orders.", [])
     learning_dashboard = learning_dashboard or LearningDashboardPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, 0, 0, "", "Read-only research. No live execution.", [])
     human_feedback = human_feedback or HumanFeedbackPanel("", False, "MISSING", "", "", 0, 0, "-", "", "Feedback is review-only. No live orders.", [], {}, [], [])
+    fundamental = fundamental or FundamentalPanel("", False, "MISSING", "", "", 0, 0, "LOW", "green", "", "Fundamental lane is review-only. No live orders.", {}, {}, [])
+    experiment_scoreboard = experiment_scoreboard or ExperimentScoreboardPanel("", False, "MISSING", "", "", 0, "-", "", "Experiment registry is review-only. No live orders.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -898,6 +976,8 @@ def build_orchestrator_page(
     pattern_memory_html = _pattern_memory_html(pattern_memory)
     learning_dashboard_html = _learning_dashboard_html(learning_dashboard)
     human_feedback_html = _human_feedback_html(human_feedback)
+    fundamental_html = _fundamental_html(fundamental)
+    experiment_scoreboard_html = _experiment_scoreboard_html(experiment_scoreboard)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -1072,6 +1152,16 @@ def build_orchestrator_page(
       <h2>Human Feedback</h2>
       <div>{human_feedback_html}</div>
       <p class="small">Label manusia menjadi bahan lesson dan eksperimen. Tidak ada auto-live dari feedback.</p>
+    </section>
+    <section class="panel">
+      <h2>Fundamental/Event Lane</h2>
+      <div>{fundamental_html}</div>
+      <p class="small">Warna risiko fundamental membantu pause/review sebelum percaya sinyal teknikal.</p>
+    </section>
+    <section class="panel">
+      <h2>Experiment Scoreboard</h2>
+      <div>{experiment_scoreboard_html}</div>
+      <p class="small">Score tinggi hanya boleh naik ke backtest/paper review, bukan langsung live.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -1273,6 +1363,12 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/human-feedback":
                     self._json_response(asdict(load_human_feedback_panel(config_path)))
                     return
+                if parsed.path == "/api/fundamental":
+                    self._json_response(asdict(load_fundamental_panel(config_path)))
+                    return
+                if parsed.path == "/api/experiment-scoreboard":
+                    self._json_response(asdict(load_experiment_scoreboard_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -1316,6 +1412,8 @@ def _handler_factory(config_path: Path):
                 pattern_memory = load_pattern_memory_panel(config_path)
                 learning_dashboard = load_learning_dashboard_panel(config_path)
                 human_feedback = load_human_feedback_panel(config_path)
+                fundamental = load_fundamental_panel(config_path)
+                experiment_scoreboard = load_experiment_scoreboard_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -1338,6 +1436,8 @@ def _handler_factory(config_path: Path):
                         pattern_memory,
                         learning_dashboard,
                         human_feedback,
+                        fundamental,
+                        experiment_scoreboard,
                         pnl,
                         walkthrough,
                     )
@@ -2010,6 +2110,77 @@ def _human_feedback_html(panel: HumanFeedbackPanel) -> str:
         + '<table class="data-table">'
         + "<thead><tr><th>Waktu</th><th>Symbol</th><th>TF</th><th>Label</th><th>Note</th><th>Reviewer</th></tr></thead>"
         + f"<tbody>{recent_rows}</tbody></table>"
+    )
+
+
+def _fundamental_html(panel: FundamentalPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    risk_css = {
+        "green": "ok",
+        "yellow": "warn",
+        "orange": "warn",
+        "red": "danger",
+    }.get(panel.color, "ok")
+    event_rows = []
+    for event in panel.events:
+        event_risk = str(event.get("risk", "LOW"))
+        event_color = "danger" if event_risk == "BLOCK" else "warn" if event_risk in {"HIGH", "MEDIUM"} else "ok"
+        event_rows.append(
+            "<tr>"
+            f"<td>{escape(str(event.get('event_time_utc', '')))}</td>"
+            f"<td>{escape(str(event.get('symbol', '')))}</td>"
+            f"<td>{escape(str(event.get('category', '')))}</td>"
+            f'<td><span class="badge {event_color}">{escape(event_risk)}</span></td>'
+            f"<td>{escape(str(event.get('title', '')))}</td>"
+            f"<td>{escape(str(event.get('source', '')))}</td>"
+            f"<td>{escape(str(event.get('note', '')))}</td>"
+            "</tr>"
+        )
+    rows = "".join(event_rows) if event_rows else '<tr><td colspan="7">Belum ada event manual. Default demo dianggap clear.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Fundamental", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Risk Color", f'<span class="badge {risk_css}">{escape(panel.top_risk)} / {escape(panel.color)}</span>')
+        + _metric("Total Events", panel.total_events)
+        + _metric("High/Block", panel.high_or_block_events)
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Waktu Event</th><th>Symbol</th><th>Kategori</th><th>Risk</th><th>Judul</th><th>Source</th><th>Note</th></tr></thead>"
+        + f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _experiment_scoreboard_html(panel: ExperimentScoreboardPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    rows = []
+    for row in panel.rows:
+        recommendation = str(row.get("recommendation", "NEEDS_EVIDENCE"))
+        rec_css = "ok" if recommendation == "PAPER_CANDIDATE" else "danger" if recommendation == "REJECTED" else "warn"
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(row.get('strategy_id', '')))}</td>"
+            f"<td>{escape(str(row.get('version', '')))}</td>"
+            f"<td>{escape(str(row.get('status', '')))}</td>"
+            f"<td>{float(row.get('total_score', 0) or 0):.2f}</td>"
+            f'<td><span class="badge {rec_css}">{escape(recommendation)}</span></td>'
+            f"<td>{escape(str(row.get('hypothesis', '')))}</td>"
+            f"<td>{escape(str(row.get('source', '')))}</td>"
+            "</tr>"
+        )
+    table_rows = "".join(rows) if rows else '<tr><td colspan="7">Belum ada eksperimen strategi. Tambahkan ide dari review pattern/feedback.</td></tr>'
+    return (
+        '<div class="grid">'
+        + _metric("Status Scoreboard", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Experiments", panel.experiment_count)
+        + _metric("Top Strategy", escape(panel.top_strategy))
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Strategy</th><th>Version</th><th>Status</th><th>Score</th><th>Rekomendasi</th><th>Hipotesis</th><th>Source</th></tr></thead>"
+        + f"<tbody>{table_rows}</tbody></table>"
     )
 
 

@@ -78,6 +78,10 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | AI guardrails | `tests/test_ai_guardrails_unittest.py` | unit | Block direct order/risk bypass recommendations |
 | Continuous skill roadmap | `tests/test_continuous_skill_roadmap_unittest.py` | static QA | Require learning loop, promotion rules, and no auto-live guardrail |
 | Pattern memory | `tests/test_pattern_memory_unittest.py` | unit | Combine paper outcomes and manual labels without live execution |
+| Fundamental/event lane | `tests/test_fundamental_unittest.py` | unit | Color news, macro, and exchange risk without live execution |
+| Experiment scoreboard | `tests/test_experiments_unittest.py` | unit | Rank strategy versions without direct live promotion |
+| User acceptance test | `tests/test_uat_unittest.py` | unit | Gate demo ready-to-use with bug list and live lock |
+| Gated live pack | `tests/test_live_gated_pack_unittest.py` | static QA | Cover LIVE1-LIVE5 while keeping real live NO_GO |
 | Learning dashboard | `tests/test_learning_dashboard_unittest.py` | unit | Summarize pattern trend, volume spike, and evidence score |
 | Hover help glossary | `tests/test_orchestrator_unittest.py` | unit | Render beginner glossary and hover text in local web UI |
 | Human feedback labels | `tests/test_human_feedback_unittest.py` | unit | Append manual labels and summarize bot lessons without live execution |

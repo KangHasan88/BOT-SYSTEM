@@ -9,6 +9,8 @@ from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
     DemoWalkthroughStep,
+    ExperimentScoreboardPanel,
+    FundamentalPanel,
     HumanFeedbackPanel,
     LearningDashboardPanel,
     LiveEvidencePanel,
@@ -23,6 +25,8 @@ from trading_bot.orchestrator import (
     build_orchestrator_page,
     load_database_panel,
     load_demo_walkthrough,
+    load_experiment_scoreboard_panel,
+    load_fundamental_panel,
     load_glossary_entries,
     load_health_summary,
     load_human_feedback_panel,
@@ -75,6 +79,8 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Pattern Memory", html)
         self.assertIn("Learning Dashboard", html)
         self.assertIn("Human Feedback", html)
+        self.assertIn("Fundamental/Event Lane", html)
+        self.assertIn("Experiment Scoreboard", html)
         self.assertIn("Kamus Awam", html)
         self.assertIn("Evidence Score", html)
         self.assertIn("Arti Awam", html)
@@ -703,6 +709,129 @@ class OrchestratorTest(unittest.TestCase):
         self.assertEqual("HUMAN_FEEDBACK_ACTIVE", panel.status)
         self.assertEqual(1, panel.total_labels)
 
+    def test_fundamental_panel_renders_risk_colors(self) -> None:
+        panel = FundamentalPanel(
+            report_path="work/market_data/reports/fundamental/report.json",
+            exists=True,
+            status="FUNDAMENTAL_BLOCK",
+            generated_at_utc="2026-07-02T00:00:00+00:00",
+            event_path="work/market_data/reports/fundamental/events.json",
+            total_events=1,
+            high_or_block_events=1,
+            top_risk="BLOCK",
+            color="red",
+            summary="1 event fundamental terbaca",
+            guardrail="Fundamental lane is review-only. No live orders.",
+            risk_counts={"BLOCK": 1},
+            category_counts={"exchange": 1},
+            events=[
+                {
+                    "symbol": "BTC/USDT",
+                    "category": "exchange",
+                    "risk": "BLOCK",
+                    "title": "Exchange maintenance",
+                    "source": "manual",
+                    "note": "pause",
+                    "event_time_utc": "2026-07-02T00:00:00+00:00",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, fundamental=panel)
+
+        self.assertIn("Fundamental/Event Lane", html)
+        self.assertIn("FUNDAMENTAL_BLOCK", html)
+        self.assertIn("BLOCK / red", html)
+        self.assertIn("Exchange maintenance", html)
+
+    def test_fundamental_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "fundamental" / "report.json",
+                {
+                    "status": "FUNDAMENTAL_HIGH_RISK",
+                    "generated_at_utc": "2026-07-02T00:00:00+00:00",
+                    "event_path": "events.json",
+                    "total_events": 1,
+                    "high_or_block_events": 1,
+                    "top_risk": "HIGH",
+                    "color": "orange",
+                    "summary": "risk",
+                    "guardrail": "No live orders.",
+                    "risk_counts": {"HIGH": 1},
+                    "category_counts": {"macro": 1},
+                    "events": [{"symbol": "BTC/USDT", "risk": "HIGH"}],
+                },
+            )
+
+            panel = load_fundamental_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("FUNDAMENTAL_HIGH_RISK", panel.status)
+        self.assertEqual("orange", panel.color)
+
+    def test_experiment_scoreboard_panel_renders_rows(self) -> None:
+        panel = ExperimentScoreboardPanel(
+            report_path="work/market_data/reports/learning/experiment_scoreboard.json",
+            exists=True,
+            status="EXPERIMENT_SCOREBOARD_ACTIVE",
+            generated_at_utc="2026-07-02T00:00:00+00:00",
+            registry_path="work/market_data/reports/learning/strategy_experiments.json",
+            experiment_count=1,
+            top_strategy="volume_spike_retest v1",
+            summary="1 eksperimen tercatat",
+            guardrail="Experiment registry is review-only. No live orders.",
+            rows=[
+                {
+                    "strategy_id": "volume_spike_retest",
+                    "version": "v1",
+                    "status": "PAPER",
+                    "total_score": 70,
+                    "recommendation": "PAPER_CANDIDATE",
+                    "hypothesis": "volume spike improves entry",
+                    "source": "manual",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, experiment_scoreboard=panel)
+
+        self.assertIn("Experiment Scoreboard", html)
+        self.assertIn("volume_spike_retest", html)
+        self.assertIn("PAPER_CANDIDATE", html)
+
+    def test_experiment_scoreboard_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "learning" / "experiment_scoreboard.json",
+                {
+                    "status": "EXPERIMENT_SCOREBOARD_ACTIVE",
+                    "generated_at_utc": "2026-07-02T00:00:00+00:00",
+                    "registry_path": "strategy_experiments.json",
+                    "experiment_count": 1,
+                    "top_strategy": "x v1",
+                    "summary": "active",
+                    "guardrail": "No live orders.",
+                    "rows": [{"strategy_id": "x", "version": "v1"}],
+                },
+            )
+
+            panel = load_experiment_scoreboard_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("EXPERIMENT_SCOREBOARD_ACTIVE", panel.status)
+        self.assertEqual(1, panel.experiment_count)
+
     def test_vps_demo_panel_renders_private_access_summary(self) -> None:
         panel = VpsDemoPanel(
             report_path="work/market_data/demo/vps_demo.json",
@@ -804,6 +933,8 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("run_cycle", ACTIONS)
         self.assertIn("seed_demo_data", ACTIONS)
         self.assertIn("testnet_demo", ACTIONS)
+        self.assertIn("fundamental", ACTIONS)
+        self.assertIn("experiment_scoreboard", ACTIONS)
         self.assertIn("live_evidence", ACTIONS)
         self.assertIn("evidence_campaign", ACTIONS)
         self.assertIn("import_runtime_db", ACTIONS)

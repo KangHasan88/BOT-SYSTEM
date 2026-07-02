@@ -34,6 +34,7 @@ from trading_bot.qa import (
     evaluate_paper_campaign,
     evaluate_production_smoke,
     evaluate_vps_readiness,
+    build_uat_report,
     generate_security_qa_report,
     run_incident_drill,
     run_risk_guard_drill,
@@ -46,6 +47,7 @@ from trading_bot.qa import (
     save_production_smoke_report,
     save_risk_guard_drill_report,
     save_security_qa_report,
+    save_uat_report,
     save_evidence_campaign_report,
     save_vps_readiness_report,
 )
@@ -55,7 +57,11 @@ from trading_bot.reports.quality import save_quality_report
 from trading_bot.reports.walk_forward import save_walk_forward_report
 from trading_bot.research import (
     ResearchDatasetCsvStore,
+    add_fundamental_event,
     add_human_feedback_label,
+    add_strategy_experiment,
+    build_experiment_scoreboard,
+    build_fundamental_report,
     build_human_feedback_report,
     build_learning_dashboard_report,
     build_pattern_outcome_dataset,
@@ -63,6 +69,8 @@ from trading_bot.research import (
     build_skill_loop_report,
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
+    save_experiment_scoreboard,
+    save_fundamental_report,
     save_human_feedback_report,
     save_learning_dashboard_report,
     save_pattern_memory_report,
@@ -140,6 +148,44 @@ def build_parser() -> argparse.ArgumentParser:
     human_feedback.add_argument("--config", default="config/bot.sample.toml")
     human_feedback.add_argument("--label-path")
     human_feedback.add_argument("--limit", type=int, default=10)
+
+    add_fundamental = subparsers.add_parser("add-fundamental-event")
+    add_fundamental.add_argument("--config", default="config/bot.sample.toml")
+    add_fundamental.add_argument("--symbol", required=True)
+    add_fundamental.add_argument("--category", required=True)
+    add_fundamental.add_argument("--risk", required=True)
+    add_fundamental.add_argument("--title", required=True)
+    add_fundamental.add_argument("--note", default="")
+    add_fundamental.add_argument("--source", default="manual")
+    add_fundamental.add_argument("--event-time-utc", default="")
+    add_fundamental.add_argument("--event-path")
+
+    fundamental = subparsers.add_parser("fundamental-report")
+    fundamental.add_argument("--config", default="config/bot.sample.toml")
+    fundamental.add_argument("--event-path")
+    fundamental.add_argument("--limit", type=int, default=12)
+
+    add_experiment = subparsers.add_parser("add-strategy-experiment")
+    add_experiment.add_argument("--config", default="config/bot.sample.toml")
+    add_experiment.add_argument("--strategy-id", required=True)
+    add_experiment.add_argument("--version", default="v0")
+    add_experiment.add_argument("--hypothesis", required=True)
+    add_experiment.add_argument("--source", default="manual")
+    add_experiment.add_argument("--status", default="IDEA")
+    add_experiment.add_argument("--backtest-score", type=float, default=0.0)
+    add_experiment.add_argument("--paper-score", type=float, default=0.0)
+    add_experiment.add_argument("--risk-score", type=float, default=0.0)
+    add_experiment.add_argument("--evidence-score", type=float, default=0.0)
+    add_experiment.add_argument("--registry-path")
+
+    experiment_scoreboard = subparsers.add_parser("experiment-scoreboard")
+    experiment_scoreboard.add_argument("--config", default="config/bot.sample.toml")
+    experiment_scoreboard.add_argument("--registry-path")
+    experiment_scoreboard.add_argument("--limit", type=int, default=12)
+
+    uat = subparsers.add_parser("uat-report")
+    uat.add_argument("--config", default="config/bot.sample.toml")
+    uat.add_argument("--bug-path")
 
     demo_data = subparsers.add_parser("seed-demo-data")
     demo_data.add_argument("--config", default="config/bot.sample.toml")
@@ -633,6 +679,114 @@ def main(argv: list[str] | None = None) -> int:
         )
         for lesson in report.lessons[:8]:
             print(f"lesson: {lesson.label} count={lesson.count}, next={lesson.next_action}")
+        return 0
+
+    if args.command == "add-fundamental-event":
+        try:
+            config = load_config(Path(args.config))
+            event = add_fundamental_event(
+                config,
+                symbol=args.symbol,
+                category=args.category,
+                risk=args.risk,
+                title=args.title,
+                note=args.note,
+                source=args.source,
+                event_time_utc=args.event_time_utc,
+                event_path=args.event_path,
+            )
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"add fundamental event failed: {exc}")
+            return 2
+
+        print(
+            "fundamental event added: "
+            f"{event.symbol} category={event.category}, risk={event.risk}, title={event.title}"
+        )
+        return 0
+
+    if args.command == "fundamental-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_fundamental_report(config, event_path=args.event_path, limit=args.limit)
+            path = save_fundamental_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"fundamental report failed: {exc}")
+            return 2
+
+        print(
+            "fundamental report: "
+            f"status={report.status}, events={report.total_events}, "
+            f"top_risk={report.top_risk}, color={report.color}, path={path}"
+        )
+        for event in report.events[:8]:
+            print(f"event: {event.symbol} {event.category} risk={event.risk}, title={event.title}")
+        return 0
+
+    if args.command == "add-strategy-experiment":
+        try:
+            config = load_config(Path(args.config))
+            experiment = add_strategy_experiment(
+                config,
+                strategy_id=args.strategy_id,
+                version=args.version,
+                hypothesis=args.hypothesis,
+                source=args.source,
+                status=args.status,
+                backtest_score=args.backtest_score,
+                paper_score=args.paper_score,
+                risk_score=args.risk_score,
+                evidence_score=args.evidence_score,
+                registry_path=args.registry_path,
+            )
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"add strategy experiment failed: {exc}")
+            return 2
+
+        print(
+            "strategy experiment added: "
+            f"{experiment.strategy_id} {experiment.version} status={experiment.status}, source={experiment.source}"
+        )
+        return 0
+
+    if args.command == "experiment-scoreboard":
+        try:
+            config = load_config(Path(args.config))
+            report = build_experiment_scoreboard(config, registry_path=args.registry_path, limit=args.limit)
+            path = save_experiment_scoreboard(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"experiment scoreboard failed: {exc}")
+            return 2
+
+        print(
+            "experiment scoreboard: "
+            f"status={report.status}, experiments={report.experiment_count}, "
+            f"top_strategy={report.top_strategy}, path={path}"
+        )
+        for row in report.rows[:8]:
+            print(
+                "experiment: "
+                f"{row.strategy_id} {row.version} status={row.status}, "
+                f"score={row.total_score:.2f}, recommendation={row.recommendation}"
+            )
+        return 0
+
+    if args.command == "uat-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_uat_report(config, bug_path=args.bug_path)
+            path = save_uat_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"uat report failed: {exc}")
+            return 2
+
+        print(
+            "uat report: "
+            f"status={report.status}, completion={report.completion_pct:.2f}, "
+            f"bugs={report.bug_count}, path={path}"
+        )
+        for check in report.checks:
+            print(f"uat: {check.name} status={check.status}, next={check.next_action}")
         return 0
 
     if args.command == "seed-demo-data":

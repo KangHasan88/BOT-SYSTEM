@@ -41,6 +41,27 @@ Launcher akan menjalankan orchestrator di background, menyimpan process id ke
 `work/orchestrator/local-web.pid`, menunggu `/api/setup`, lalu membuka browser
 ketika sudah siap.
 
+Jika halaman `127.0.0.1:8000` mati atau muncul `refused to connect`, jalankan
+watchdog lokal:
+
+```text
+start-bot-watchdog.cmd
+```
+
+Watchdog mengecek `http://127.0.0.1:8000/api/status` berkala. Jika tidak sehat,
+helper akan memanggil `scripts/start-local-orchestrator.ps1` tanpa membuka
+browser baru. Log watchdog tersimpan di:
+
+```text
+work/orchestrator/watchdog.log
+```
+
+Untuk repair sekali jalan:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\watch-local-orchestrator.ps1 -MaxChecks 1
+```
+
 Untuk stop:
 
 ```powershell
@@ -303,6 +324,70 @@ Status yang sama tersedia sebagai JSON di:
 
 ```text
 http://127.0.0.1:8000/api/human-feedback
+```
+
+## Fundamental/Event Lane
+
+Panel `Fundamental/Event Lane` membaca:
+
+```text
+work/market_data/reports/fundamental/report.json
+```
+
+Event manual disimpan di:
+
+```text
+work/market_data/reports/fundamental/events.json
+```
+
+Risk color:
+
+- `LOW / green`: lanjut review teknikal.
+- `MEDIUM / yellow`: hati-hati, cek volatilitas dan spread.
+- `HIGH / orange`: pause entry baru sampai event lewat atau direview.
+- `BLOCK / red`: jangan percaya sinyal baru sebelum owner review.
+
+Command:
+
+```bash
+python -m trading_bot.cli add-fundamental-event --config config/bot.sample.toml --symbol BTC/USDT --category macro --risk HIGH --title "US CPI release window" --note "pause entry baru dekat event"
+python -m trading_bot.cli fundamental-report --config config/bot.sample.toml
+```
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/fundamental
+```
+
+## Experiment Scoreboard
+
+Panel `Experiment Scoreboard` membaca:
+
+```text
+work/market_data/reports/learning/experiment_scoreboard.json
+```
+
+Registry eksperimen strategi tersimpan di:
+
+```text
+work/market_data/reports/learning/strategy_experiments.json
+```
+
+Gunakan command:
+
+```bash
+python -m trading_bot.cli add-strategy-experiment --config config/bot.sample.toml --strategy-id volume_spike_retest --version v1 --hypothesis "volume spike after sweep improves entry timing" --status PAPER --backtest-score 30 --paper-score 25 --evidence-score 20 --risk-score 5
+python -m trading_bot.cli experiment-scoreboard --config config/bot.sample.toml
+```
+
+Score tinggi hanya boleh mendorong eksperimen ke backtest/paper review. Tidak
+ada promosi langsung ke live.
+
+Endpoint:
+
+```text
+http://127.0.0.1:8000/api/experiment-scoreboard
 ```
 
 ## Setup Cepat

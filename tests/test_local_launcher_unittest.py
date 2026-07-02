@@ -7,8 +7,10 @@ from pathlib import Path
 class LocalLauncherTest(unittest.TestCase):
     def test_launcher_files_exist(self) -> None:
         self.assertTrue(Path("start-bot-web.cmd").exists())
+        self.assertTrue(Path("start-bot-watchdog.cmd").exists())
         self.assertTrue(Path("scripts/start-local-orchestrator.ps1").exists())
         self.assertTrue(Path("scripts/stop-local-orchestrator.ps1").exists())
+        self.assertTrue(Path("scripts/watch-local-orchestrator.ps1").exists())
 
     def test_cmd_launcher_points_to_powershell_script(self) -> None:
         text = Path("start-bot-web.cmd").read_text(encoding="utf-8")
@@ -25,12 +27,25 @@ class LocalLauncherTest(unittest.TestCase):
         self.assertIn("Start-Process", text)
         self.assertIn("WindowStyle Hidden", text)
 
+    def test_watchdog_repairs_local_web_server(self) -> None:
+        text = Path("scripts/watch-local-orchestrator.ps1").read_text(encoding="utf-8")
+        cmd = Path("start-bot-watchdog.cmd").read_text(encoding="utf-8")
+
+        self.assertIn("/api/status", text)
+        self.assertIn("MaxChecks", text)
+        self.assertIn("watchdog.log", text)
+        self.assertIn("start-local-orchestrator.ps1", text)
+        self.assertIn("WindowStyle Hidden", text)
+        self.assertIn("watch-local-orchestrator.ps1", cmd)
+
     def test_launcher_does_not_expose_live_trading_commands(self) -> None:
         combined = "\n".join(
             [
                 Path("start-bot-web.cmd").read_text(encoding="utf-8"),
+                Path("start-bot-watchdog.cmd").read_text(encoding="utf-8"),
                 Path("scripts/start-local-orchestrator.ps1").read_text(encoding="utf-8"),
                 Path("scripts/stop-local-orchestrator.ps1").read_text(encoding="utf-8"),
+                Path("scripts/watch-local-orchestrator.ps1").read_text(encoding="utf-8"),
             ]
         ).lower()
 

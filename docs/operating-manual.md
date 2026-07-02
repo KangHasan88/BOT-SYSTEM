@@ -18,6 +18,7 @@ python -m trading_bot.cli risk-guard-drill --config config/bot.sample.toml --sym
 UX direction: `docs/ux-architecture-decision.md`
 Local web orchestrator: `docs/local-web-orchestrator.md`
 Database storage lokal: `docs/database-storage.md`
+Gated live demo pack: `docs/live-demo-gated-pack.md`
 
 Start local web orchestrator:
 
@@ -25,6 +26,21 @@ Start local web orchestrator:
 cd C:\Users\IT-MGR\Documents\Codex\2026-06-28\bro-2
 & 'C:\Users\IT-MGR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m trading_bot.cli serve-orchestrator --config config/bot.sample.toml --host 127.0.0.1 --port 8000
 ```
+
+Cara paling gampang:
+
+```powershell
+.\start-bot-web.cmd
+```
+
+Jika browser `127.0.0.1:8000` refused, jalankan watchdog:
+
+```powershell
+.\start-bot-watchdog.cmd
+```
+
+Watchdog hanya menjaga web demo/paper tetap hidup. Tidak ada order live dari
+helper ini.
 
 Dashboard lokal:
 
@@ -51,6 +67,11 @@ python -m trading_bot.cli pattern-memory-report --config config/bot.sample.toml
 python -m trading_bot.cli learning-dashboard-report --config config/bot.sample.toml
 python -m trading_bot.cli add-feedback-label --config config/bot.sample.toml --symbol BTC/USDT --timeframe 15m --label entry_telat --note "entry terlalu jauh dari trigger"
 python -m trading_bot.cli human-feedback-report --config config/bot.sample.toml
+python -m trading_bot.cli add-fundamental-event --config config/bot.sample.toml --symbol BTC/USDT --category macro --risk HIGH --title "US CPI release window" --note "pause entry baru dekat event"
+python -m trading_bot.cli fundamental-report --config config/bot.sample.toml
+python -m trading_bot.cli add-strategy-experiment --config config/bot.sample.toml --strategy-id volume_spike_retest --version v1 --hypothesis "volume spike after sweep improves entry timing" --status PAPER --backtest-score 30 --paper-score 25 --evidence-score 20 --risk-score 5
+python -m trading_bot.cli experiment-scoreboard --config config/bot.sample.toml
+python -m trading_bot.cli uat-report --config config/bot.sample.toml
 ```
 
 ## Data Collection

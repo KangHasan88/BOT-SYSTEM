@@ -49,6 +49,7 @@ from trading_bot.qa.risk_guard import (
     save_risk_guard_drill_report,
 )
 from trading_bot.qa.security import SecurityQaCheck, SecurityQaReport, generate_security_qa_report, save_security_qa_report
+from trading_bot.qa.uat import UatCheck, UatReport, build_uat_report, save_uat_report
 from trading_bot.qa.vps_readiness import (
     VpsReadinessCheck,
     VpsReadinessReport,
@@ -93,8 +94,12 @@ __all__ = [
     "save_risk_guard_drill_report",
     "SecurityQaCheck",
     "SecurityQaReport",
+    "UatCheck",
+    "UatReport",
+    "build_uat_report",
     "generate_security_qa_report",
     "save_security_qa_report",
+    "save_uat_report",
     "VpsReadinessCheck",
     "VpsReadinessReport",
     "evaluate_vps_readiness",
