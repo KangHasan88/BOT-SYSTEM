@@ -15,6 +15,8 @@ from trading_bot.orchestrator import (
     LearningDashboardPanel,
     LiveEvidencePanel,
     LocalDemoPanel,
+    MarketFeedPanel,
+    MarketFeedRow,
     PaperCampaignPanel,
     PatternMemoryPanel,
     SkillLoopPanel,
@@ -34,6 +36,7 @@ from trading_bot.orchestrator import (
     load_learning_dashboard_panel,
     load_live_evidence_panel,
     load_local_demo_panel,
+    load_market_feed_panel,
     load_orchestrator_status,
     load_paper_campaign_panel,
     load_pattern_memory_panel,
@@ -93,6 +96,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Cek Data Market", html)
         self.assertIn("Pantau P/L", html)
         self.assertIn("P/L Visual Monitor", html)
+        self.assertIn("Market Data Feed", html)
         self.assertIn("Review Go Live", html)
         self.assertIn("Setup Cepat", html)
         self.assertIn("Browser Laporan", html)
@@ -128,6 +132,31 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn(health.paper_status, {"ACTIVE", "NO_TRADES"})
         self.assertTrue(health.readiness_status)
         self.assertIn(health.safety_status, {"SAFE", "BLOCKED"})
+
+    def test_market_feed_panel_shows_latest_local_candle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            candle_path = data_root / "BTC_USDT" / "15m.csv"
+            candle_path.parent.mkdir(parents=True, exist_ok=True)
+            candle_path.write_text(
+                "symbol,timeframe,open_time_ms,open,high,low,close,volume,close_time_ms,source\n"
+                "BTC/USDT,15m,1710000000000,100,110,99,108,12,1710000899999,binance_public\n",
+                encoding="utf-8",
+            )
+
+            panel = load_market_feed_panel(config_path)
+            html = build_orchestrator_page(load_orchestrator_status(config_path), market_feed=panel)
+
+        self.assertEqual(1, len(panel.rows))
+        self.assertEqual("OK", panel.rows[0].status)
+        self.assertEqual("binance_public", panel.rows[0].source)
+        self.assertIn("Market Data Feed", html)
+        self.assertIn("BTC/USDT", html)
+        self.assertIn("binance_public", html)
+        self.assertIn("108.00000000", html)
 
     def test_setup_wizard_reports_first_run_steps(self) -> None:
         checks = load_setup_wizard("config/bot.sample.toml")
@@ -1004,6 +1033,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("sync_btc_15m", ACTIONS)
         self.assertIn("sync_eth_15m", ACTIONS)
         self.assertIn("incident_drill", ACTIONS)
+        self.assertIn("--sync-latest", ACTIONS["run_cycle"])
         rendered = " ".join(" ".join(command) for command in ACTIONS.values()).lower()
 
         self.assertNotIn("live-order", rendered)

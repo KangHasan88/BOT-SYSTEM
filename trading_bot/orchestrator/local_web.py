@@ -39,7 +39,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "evidence_campaign": ("evidence-campaign-report", "--config", "{config}", "--seed-demo-if-needed"),
     "testnet_demo": ("testnet-demo-report", "--config", "{config}", "--environment", "testnet"),
     "paper_campaign": ("paper-campaign-report", "--config", "{config}"),
-    "run_cycle": ("run-cycle", "--config", "{config}", "--limit", "{limit}"),
+    "run_cycle": ("run-cycle", "--config", "{config}", "--sync-latest", "--limit", "{limit}"),
     "sync_btc_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "BTC/USDT", "--timeframe", "15m", "--limit", "{limit}"),
     "sync_eth_15m": ("sync-ohlcv", "--config", "{config}", "--symbol", "ETH/USDT", "--timeframe", "15m", "--limit", "{limit}"),
 }
@@ -346,6 +346,23 @@ class PnlPanel:
     equity_points: list[float]
 
 
+@dataclass(frozen=True)
+class MarketFeedRow:
+    symbol: str
+    timeframe: str
+    candle_count: int
+    latest_open_utc: str
+    latest_close: float
+    source: str
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class MarketFeedPanel:
+    rows: list[MarketFeedRow]
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -364,6 +381,38 @@ def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml")
         action_running=_lock_path(root).exists(),
         running_action=_running_action(root),
     )
+
+
+def load_market_feed_panel(config_path: str | Path = "config/bot.sample.toml") -> MarketFeedPanel:
+    config = load_config(Path(config_path))
+    root = Path(config.data_root)
+    rows: list[MarketFeedRow] = []
+    for symbol in config.symbols:
+        for timeframe in config.timeframes:
+            candle_rows = _read_candle_rows(root, symbol, timeframe)
+            latest = candle_rows[-1] if candle_rows else {}
+            latest_time = _format_ms(str(latest.get("open_time_ms", ""))) if latest else "-"
+            latest_close = _safe_float(str(latest.get("close", "0"))) if latest else 0.0
+            source = str(latest.get("source") or "-") if latest else "-"
+            status = "OK" if candle_rows else "MISSING"
+            reason = (
+                f"latest candle from {source}"
+                if candle_rows
+                else "belum ada candle lokal; klik Jalankan Siklus atau Sinkron"
+            )
+            rows.append(
+                MarketFeedRow(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    candle_count=len(candle_rows),
+                    latest_open_utc=latest_time,
+                    latest_close=latest_close,
+                    source=source,
+                    status=status,
+                    reason=reason,
+                )
+            )
+    return MarketFeedPanel(rows)
 
 
 def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> list[SetupCheck]:
@@ -935,6 +984,7 @@ def build_orchestrator_page(
     fundamental: FundamentalPanel | None = None,
     experiment_scoreboard: ExperimentScoreboardPanel | None = None,
     pnl: PnlPanel | None = None,
+    market_feed: MarketFeedPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
     activities = activities or []
@@ -957,6 +1007,7 @@ def build_orchestrator_page(
     fundamental = fundamental or FundamentalPanel("", False, "MISSING", "", "", 0, 0, "LOW", "green", "", "Fundamental lane is review-only. No live orders.", {}, {}, [])
     experiment_scoreboard = experiment_scoreboard or ExperimentScoreboardPanel("", False, "MISSING", "", "", 0, "-", "", "Experiment registry is review-only. No live orders.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
+    market_feed = market_feed or MarketFeedPanel([])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
@@ -981,6 +1032,7 @@ def build_orchestrator_page(
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     getting_started_html = _getting_started_html(status)
     pnl_html = _pnl_panel_html(pnl)
+    market_feed_html = _market_feed_html(market_feed)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
@@ -1184,6 +1236,11 @@ def build_orchestrator_page(
       <h2>Experiment Scoreboard</h2>
       <div>{experiment_scoreboard_html}</div>
       <p class="small">Score tinggi hanya boleh naik ke backtest/paper review, bukan langsung live.</p>
+    </section>
+    <section class="panel" id="market-feed">
+      <h2>Market Data Feed</h2>
+      <div>{market_feed_html}</div>
+      <p class="small">Panel ini menunjukkan candle lokal terakhir. Klik Jalankan Siklus untuk mencoba sync candle terbaru sebelum analisa paper.</p>
     </section>
     <section class="panel" id="pnl-monitor">
       <h2>P/L Visual Monitor</h2>
@@ -1443,6 +1500,7 @@ def _handler_factory(config_path: Path):
                 fundamental = load_fundamental_panel(config_path)
                 experiment_scoreboard = load_experiment_scoreboard_panel(config_path)
                 pnl = load_pnl_panel(config_path)
+                market_feed = load_market_feed_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
                     build_orchestrator_page(
@@ -1467,6 +1525,7 @@ def _handler_factory(config_path: Path):
                         fundamental,
                         experiment_scoreboard,
                         pnl,
+                        market_feed,
                         walkthrough,
                     )
                 )
@@ -1933,6 +1992,33 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         '<table class="data-table">'
         "<thead><tr><th>Waktu Exit</th><th>Symbol</th><th>TF</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Alasan Exit</th></tr></thead>"
         f"<tbody>{trade_rows}</tbody></table></div>"
+    )
+
+
+def _market_feed_html(panel: MarketFeedPanel) -> str:
+    if not panel.rows:
+        return '<p class="small">Belum ada konfigurasi symbol/timeframe untuk dibaca.</p>'
+    rows = []
+    for row in panel.rows:
+        css = "ok" if row.status == "OK" else "warn"
+        close_text = f"{row.latest_close:.8f}" if row.latest_close else "-"
+        rows.append(
+            "<tr>"
+            f"<td>{escape(row.symbol)}</td>"
+            f"<td>{escape(row.timeframe)}</td>"
+            f'<td><span class="badge {css}">{escape(row.status)}</span></td>'
+            f"<td>{row.candle_count}</td>"
+            f"<td>{escape(row.latest_open_utc)}</td>"
+            f"<td>{close_text}</td>"
+            f"<td>{escape(row.source)}</td>"
+            f"<td>{escape(row.reason)}</td>"
+            "</tr>"
+        )
+    return (
+        '<div class="pnl-table-wrap">'
+        '<table class="data-table">'
+        "<thead><tr><th>Symbol</th><th>TF</th><th>Status</th><th>Candles</th><th>Candle Terakhir UTC</th><th>Close</th><th>Source</th><th>Arti</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -2795,6 +2881,7 @@ def _help_text_for(label: str) -> str:
         "validasi config": "Cek mode bot, live lock, dan simbol tanpa melakukan order.",
         "import db": "Masukkan data CSV/JSON lokal ke SQLite agar bisa dipelajari.",
         "learning db": "Buat snapshot pola dari database lokal.",
+        "jalankan siklus": "Ambil candle terbaru, proses analisa paper, update laporan, lalu refresh P/L demo. Tetap tidak membuat order live.",
         "live evidence": direct["evidence"],
         "paper campaign": direct["paper/demo"],
         "kill switch": direct["kill switch"],
@@ -2862,6 +2949,23 @@ def _count_csv_rows(root: Path, filename: str) -> int:
         with path.open("r", newline="", encoding="utf-8") as handle:
             total += sum(1 for _ in csv.DictReader(handle))
     return total
+
+
+def _read_candle_rows(root: Path, symbol: str, timeframe: str) -> list[dict[str, str]]:
+    path = root / symbol.replace("/", "_") / f"{timeframe}.csv"
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    rows.sort(key=lambda row: int(row.get("open_time_ms", 0) or 0))
+    return rows
+
+
+def _safe_float(value: str) -> float:
+    try:
+        return float(value)
+    except ValueError:
+        return 0.0
 
 
 def _load_paper_trade_rows(root: Path) -> list[PnlTradeRow]:
