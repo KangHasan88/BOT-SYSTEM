@@ -330,6 +330,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("saldo demo terakhir turun", html)
         self.assertIn("5989.67 - 6000.00 = -10.33 USDT", html)
         self.assertIn("USDT, patokan dollar stablecoin", html)
+        self.assertNotIn('&lt;span class=&quot;small&quot;&gt;', html)
         self.assertIn("Aksi berikut", html)
         self.assertIn("Equity Change", html)
 

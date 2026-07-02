@@ -1895,7 +1895,7 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         + _metric("Equity Terakhir", f"{panel.latest_equity:.8f}")
         + _metric(
             "Equity Change",
-            f'{panel.equity_change_pct:.2f}%<span class="small">{escape(equity_delta_text)}</span>',
+            f'<span>{panel.equity_change_pct:.2f}%</span><span class="small">{escape(equity_delta_text)}</span>',
         )
         + _metric("Best/Worst Trade", f"{panel.best_trade_pnl:.8f} / {panel.worst_trade_pnl:.8f}")
         + "</div>"
