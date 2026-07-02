@@ -363,6 +363,29 @@ class MarketFeedPanel:
     rows: list[MarketFeedRow]
 
 
+@dataclass(frozen=True)
+class PaperExecutionRow:
+    time_utc: str
+    symbol: str
+    timeframe: str
+    action: str
+    side: str
+    status: str
+    price: float
+    quantity: float
+    notional: float
+    fee: float
+    reason: str
+
+
+@dataclass(frozen=True)
+class PaperExecutionPanel:
+    order_count: int
+    filled_count: int
+    rejected_count: int
+    latest_rows: list[PaperExecutionRow]
+
+
 def load_orchestrator_status(config_path: str | Path = "config/bot.sample.toml") -> OrchestratorStatus:
     config = load_config(Path(config_path))
     kill_switch = read_kill_switch(config.data_root)
@@ -413,6 +436,20 @@ def load_market_feed_panel(config_path: str | Path = "config/bot.sample.toml") -
                 )
             )
     return MarketFeedPanel(rows)
+
+
+def load_paper_execution_panel(config_path: str | Path = "config/bot.sample.toml", limit: int = 8) -> PaperExecutionPanel:
+    config = load_config(Path(config_path))
+    rows = _load_paper_order_rows(Path(config.data_root) / "paper")
+    filled = sum(1 for row in rows if row.status == "FILLED")
+    rejected = sum(1 for row in rows if row.status == "REJECTED")
+    latest = sorted(rows, key=lambda row: row.time_utc, reverse=True)[:limit]
+    return PaperExecutionPanel(
+        order_count=len(rows),
+        filled_count=filled,
+        rejected_count=rejected,
+        latest_rows=latest,
+    )
 
 
 def load_setup_wizard(config_path: str | Path = "config/bot.sample.toml") -> list[SetupCheck]:
@@ -985,6 +1022,7 @@ def build_orchestrator_page(
     experiment_scoreboard: ExperimentScoreboardPanel | None = None,
     pnl: PnlPanel | None = None,
     market_feed: MarketFeedPanel | None = None,
+    paper_execution: PaperExecutionPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
     activities = activities or []
@@ -1008,6 +1046,7 @@ def build_orchestrator_page(
     experiment_scoreboard = experiment_scoreboard or ExperimentScoreboardPanel("", False, "MISSING", "", "", 0, "-", "", "Experiment registry is review-only. No live orders.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     market_feed = market_feed or MarketFeedPanel([])
+    paper_execution = paper_execution or PaperExecutionPanel(0, 0, 0, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
@@ -1033,6 +1072,7 @@ def build_orchestrator_page(
     getting_started_html = _getting_started_html(status)
     pnl_html = _pnl_panel_html(pnl)
     market_feed_html = _market_feed_html(market_feed)
+    paper_execution_html = _paper_execution_html(paper_execution)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
     live_text = "LIVE AKTIF" if status.live_enabled else "Live Nonaktif"
@@ -1241,6 +1281,11 @@ def build_orchestrator_page(
       <h2>Market Data Feed</h2>
       <div>{market_feed_html}</div>
       <p class="small">Panel ini menunjukkan candle lokal terakhir. Klik Jalankan Siklus untuk mencoba sync candle terbaru sebelum analisa paper.</p>
+    </section>
+    <section class="panel" id="paper-execution">
+      <h2>Paper Execution</h2>
+      <div>{paper_execution_html}</div>
+      <p class="small">Panel ini menunjukkan order simulasi paper: filled, rejected, open, close, dan alasannya. Ini tetap bukan order live.</p>
     </section>
     <section class="panel" id="pnl-monitor">
       <h2>P/L Visual Monitor</h2>
@@ -1501,6 +1546,7 @@ def _handler_factory(config_path: Path):
                 experiment_scoreboard = load_experiment_scoreboard_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 market_feed = load_market_feed_panel(config_path)
+                paper_execution = load_paper_execution_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
                     build_orchestrator_page(
@@ -1526,6 +1572,7 @@ def _handler_factory(config_path: Path):
                         experiment_scoreboard,
                         pnl,
                         market_feed,
+                        paper_execution,
                         walkthrough,
                     )
                 )
@@ -2019,6 +2066,43 @@ def _market_feed_html(panel: MarketFeedPanel) -> str:
         '<table class="data-table">'
         "<thead><tr><th>Symbol</th><th>TF</th><th>Status</th><th>Candles</th><th>Candle Terakhir UTC</th><th>Close</th><th>Source</th><th>Arti</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _paper_execution_html(panel: PaperExecutionPanel) -> str:
+    summary = (
+        '<div class="grid">'
+        + _metric("Paper Orders", panel.order_count, "Total order simulasi yang tercatat.")
+        + _metric("Filled", f'<span class="badge ok">{panel.filled_count}</span>', "Order simulasi yang berhasil dieksekusi.")
+        + _metric("Rejected", f'<span class="badge warn">{panel.rejected_count}</span>', "Order simulasi yang ditolak risk/session guard.")
+        + "</div>"
+    )
+    if not panel.latest_rows:
+        return summary + '<p class="small">Belum ada order paper. Klik Jalankan Siklus setelah data market tersedia.</p>'
+    rows = []
+    for row in panel.latest_rows:
+        css = "ok" if row.status == "FILLED" else "warn" if row.status == "REJECTED" else "danger"
+        rows.append(
+            "<tr>"
+            f"<td>{escape(row.time_utc)}</td>"
+            f"<td>{escape(row.symbol)}</td>"
+            f"<td>{escape(row.timeframe)}</td>"
+            f"<td>{escape(row.action)}</td>"
+            f"<td>{escape(row.side)}</td>"
+            f'<td><span class="badge {css}">{escape(row.status)}</span></td>'
+            f"<td>{row.price:.8f}</td>"
+            f"<td>{row.quantity:.8f}</td>"
+            f"<td>{row.notional:.8f}</td>"
+            f"<td>{row.fee:.8f}</td>"
+            f"<td>{escape(row.reason)}</td>"
+            "</tr>"
+        )
+    return (
+        summary
+        + '<div class="pnl-table-wrap">'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Waktu</th><th>Symbol</th><th>TF</th><th>Aksi</th><th>Side</th><th>Status</th><th>Price</th><th>Qty</th><th>Notional</th><th>Fee</th><th>Alasan</th></tr></thead>"
+        + f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -2992,6 +3076,36 @@ def _load_paper_trade_rows(root: Path) -> list[PnlTradeRow]:
                 except ValueError:
                     continue
     return sorted(rows, key=lambda trade: trade.exit_time)
+
+
+def _load_paper_order_rows(root: Path) -> list[PaperExecutionRow]:
+    rows: list[PaperExecutionRow] = []
+    if not root.exists():
+        return rows
+    for path in root.rglob("orders.csv"):
+        if not path.exists() or path.stat().st_size == 0:
+            continue
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    rows.append(
+                        PaperExecutionRow(
+                            time_utc=_format_ms(row.get("open_time_ms", "")),
+                            symbol=str(row.get("symbol", "")),
+                            timeframe=str(row.get("timeframe", "")),
+                            action=str(row.get("action", "")),
+                            side=str(row.get("side", "")),
+                            status=str(row.get("status", "")),
+                            price=float(row.get("price", 0) or 0),
+                            quantity=float(row.get("quantity", 0) or 0),
+                            notional=float(row.get("notional", 0) or 0),
+                            fee=float(row.get("fee", 0) or 0),
+                            reason=str(row.get("reason", "")),
+                        )
+                    )
+                except ValueError:
+                    continue
+    return sorted(rows, key=lambda order: order.time_utc)
 
 
 def _load_equity_series(root: Path) -> list[list[float]]:

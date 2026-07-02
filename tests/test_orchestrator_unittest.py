@@ -18,6 +18,8 @@ from trading_bot.orchestrator import (
     MarketFeedPanel,
     MarketFeedRow,
     PaperCampaignPanel,
+    PaperExecutionPanel,
+    PaperExecutionRow,
     PatternMemoryPanel,
     SkillLoopPanel,
     PnlPanel,
@@ -39,6 +41,7 @@ from trading_bot.orchestrator import (
     load_market_feed_panel,
     load_orchestrator_status,
     load_paper_campaign_panel,
+    load_paper_execution_panel,
     load_pattern_memory_panel,
     load_skill_loop_panel,
     load_pnl_panel,
@@ -97,6 +100,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Pantau P/L", html)
         self.assertIn("P/L Visual Monitor", html)
         self.assertIn("Market Data Feed", html)
+        self.assertIn("Paper Execution", html)
         self.assertIn("Review Go Live", html)
         self.assertIn("Setup Cepat", html)
         self.assertIn("Browser Laporan", html)
@@ -157,6 +161,31 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("BTC/USDT", html)
         self.assertIn("binance_public", html)
         self.assertIn("108.00000000", html)
+
+    def test_paper_execution_panel_shows_latest_order_reasons(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            order_path = data_root / "paper" / "BTC_USDT" / "15m" / "orders.csv"
+            order_path.parent.mkdir(parents=True, exist_ok=True)
+            order_path.write_text(
+                "symbol,timeframe,open_time_ms,side,action,price,quantity,notional,fee,status,reason\n"
+                "BTC/USDT,15m,1710000000000,buy,OPEN,100,0.1,10,0.01,FILLED,risk approved\n"
+                "BTC/USDT,15m,1710000900000,buy,OPEN,101,0,0,0,REJECTED,outside entry window\n",
+                encoding="utf-8",
+            )
+
+            panel = load_paper_execution_panel(config_path)
+            html = build_orchestrator_page(load_orchestrator_status(config_path), paper_execution=panel)
+
+        self.assertEqual(2, panel.order_count)
+        self.assertEqual(1, panel.filled_count)
+        self.assertEqual(1, panel.rejected_count)
+        self.assertIn("Paper Execution", html)
+        self.assertIn("outside entry window", html)
+        self.assertIn("risk approved", html)
 
     def test_setup_wizard_reports_first_run_steps(self) -> None:
         checks = load_setup_wizard("config/bot.sample.toml")
