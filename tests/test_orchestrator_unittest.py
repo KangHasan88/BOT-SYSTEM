@@ -328,6 +328,8 @@ class OrchestratorTest(unittest.TestCase):
 
         self.assertIn("Campuran / Perlu Review", html)
         self.assertIn("saldo demo terakhir turun", html)
+        self.assertIn("5989.67 - 6000.00 = -10.33 USDT", html)
+        self.assertIn("USDT, patokan dollar stablecoin", html)
         self.assertIn("Aksi berikut", html)
         self.assertIn("Equity Change", html)
 

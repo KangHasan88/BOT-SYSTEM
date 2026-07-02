@@ -1865,6 +1865,7 @@ def _paper_pnl_text(reason: str) -> str:
 
 def _pnl_panel_html(panel: PnlPanel) -> str:
     pnl_css = "ok" if panel.net_pnl >= 0 else "danger"
+    equity_delta_text = _equity_delta_text(panel)
     summary_html = _pnl_summary_html(panel)
     latest_trade = panel.latest_trade
     trade_rows = ""
@@ -1892,7 +1893,10 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         + _metric("Win Rate", f"{panel.win_rate_pct:.2f}%")
         + _metric("Trades", panel.trade_count)
         + _metric("Equity Terakhir", f"{panel.latest_equity:.8f}")
-        + _metric("Equity Change", f"{panel.equity_change_pct:.2f}%")
+        + _metric(
+            "Equity Change",
+            f'{panel.equity_change_pct:.2f}%<span class="small">{escape(equity_delta_text)}</span>',
+        )
         + _metric("Best/Worst Trade", f"{panel.best_trade_pnl:.8f} / {panel.worst_trade_pnl:.8f}")
         + "</div>"
         "</div>"
@@ -1910,6 +1914,8 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
 
 def _pnl_summary_html(panel: PnlPanel) -> str:
     status, css, summary, next_action = _pnl_plain_status(panel)
+    equity_delta_text = _equity_delta_text(panel)
+    currency_label = _pnl_currency_label(panel)
     return (
         '<div class="pnl-summary">'
         + '<div class="pnl-summary-head">'
@@ -1917,6 +1923,8 @@ def _pnl_summary_html(panel: PnlPanel) -> str:
         + f'<span class="badge {css}">{escape(status)}</span>'
         + "</div>"
         + f"<p>{escape(summary)}</p>"
+        + f"<p><strong>Hitungan saldo:</strong> {escape(equity_delta_text)}</p>"
+        + f"<p><strong>Satuan:</strong> {escape(currency_label)}. Ini bukan Rupiah kecuali bot memang memakai pair IDR.</p>"
         + f"<p><strong>Aksi berikut:</strong> {escape(next_action)}</p>"
         + '<div class="pnl-guide">'
         + "<div><strong>Realized P/L Demo</strong>Total profit/rugi dari trade yang sudah selesai.</div>"
@@ -1963,6 +1971,28 @@ def _pnl_plain_status(panel: PnlPanel) -> tuple[str, str, str, str]:
         f"Saldo demo naik {panel.equity_change_pct:.2f}%, tapi realized P/L total masih negatif {panel.net_pnl:.8f}.",
         "Review data akun dan trade detail sebelum mengambil kesimpulan.",
     )
+
+
+def _equity_delta_text(panel: PnlPanel) -> str:
+    delta = panel.latest_equity - panel.initial_equity
+    return f"{panel.latest_equity:.2f} - {panel.initial_equity:.2f} = {delta:+.2f} {_pnl_currency_code(panel)}"
+
+
+def _pnl_currency_label(panel: PnlPanel) -> str:
+    code = _pnl_currency_code(panel)
+    if code == "USDT":
+        return "USDT, patokan dollar stablecoin"
+    if code == "USD":
+        return "USD / Dollar"
+    if code == "IDR":
+        return "IDR / Rupiah"
+    return code
+
+
+def _pnl_currency_code(panel: PnlPanel) -> str:
+    if panel.latest_trade and "/" in panel.latest_trade.symbol:
+        return panel.latest_trade.symbol.rsplit("/", 1)[1].upper()
+    return "USDT"
 
 
 def _demo_walkthrough_html(steps: list[DemoWalkthroughStep]) -> str:

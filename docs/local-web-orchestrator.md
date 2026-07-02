@@ -269,7 +269,12 @@ Cara baca cepat:
 
 - `Equity Terakhir` adalah saldo simulasi terakhir.
 - `Equity Change` adalah naik/turun saldo dari awal. Minus berarti saldo demo
-  sedang turun.
+  sedang turun. Panel juga menampilkan hitungan nominalnya, misalnya
+  `5989.67 - 6000.00 = -10.33 USDT`, supaya rugi/untung dari saldo awal
+  langsung terbaca.
+- `Satuan` mengikuti quote currency dari pair. `ETH/USDT` berarti USDT
+  (patokan dollar stablecoin), bukan Rupiah. Pair IDR baru dibaca sebagai
+  Rupiah.
 - `Realized P/L Demo` adalah total profit/rugi dari trade yang sudah selesai.
 - `Win Rate` hanya persentase trade menang; tidak otomatis berarti strategi
   aman.
