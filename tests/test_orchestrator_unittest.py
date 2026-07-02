@@ -330,9 +330,30 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("saldo demo terakhir turun", html)
         self.assertIn("5989.67 - 6000.00 = -10.33 USDT", html)
         self.assertIn("USDT, patokan dollar stablecoin", html)
+        self.assertIn('class="metric-note delta-danger"', html)
         self.assertNotIn('&lt;span class=&quot;small&quot;&gt;', html)
         self.assertIn("Aksi berikut", html)
         self.assertIn("Equity Change", html)
+
+    def test_pnl_panel_colors_positive_equity_delta_green(self) -> None:
+        pnl = PnlPanel(
+            trade_count=3,
+            win_rate_pct=66.67,
+            net_pnl=25.0,
+            initial_equity=1000.0,
+            latest_equity=1025.0,
+            equity_change_pct=2.5,
+            best_trade_pnl=20.0,
+            worst_trade_pnl=-2.0,
+            latest_trade=PnlTradeRow("BTC/USDT", "15m", "2026-07-01T00:00+00:00", 100.0, 105.0, 20.0, "TP"),
+            equity_points=[1000.0, 1025.0],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, pnl=pnl)
+
+        self.assertIn("1025.00 - 1000.00 = +25.00 USDT", html)
+        self.assertIn('class="metric-note delta-ok"', html)
 
     def test_demo_walkthrough_renders_numbered_beginner_steps(self) -> None:
         walkthrough = [
