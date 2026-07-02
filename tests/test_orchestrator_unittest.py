@@ -302,10 +302,34 @@ class OrchestratorTest(unittest.TestCase):
         html = build_orchestrator_page(status, pnl=pnl)
 
         self.assertIn("P/L Visual Monitor", html)
+        self.assertIn("Kesimpulan Awam", html)
+        self.assertIn("Profit Demo", html)
         self.assertIn("Realized P/L Demo", html)
         self.assertIn("Equity curve demo", html)
         self.assertIn("BTC/USDT", html)
         self.assertIn("SESSION_END", html)
+
+    def test_pnl_panel_explains_mixed_profit_and_equity_drawdown(self) -> None:
+        pnl = PnlPanel(
+            trade_count=19,
+            win_rate_pct=63.16,
+            net_pnl=187.61379981,
+            initial_equity=6000.0,
+            latest_equity=5989.6706342,
+            equity_change_pct=-0.17,
+            best_trade_pnl=36.34904994,
+            worst_trade_pnl=-3.04754787,
+            latest_trade=PnlTradeRow("ETH/USDT", "4h", "2024-08-23T09:33+00:00", 3827.62, 4234.67, 27.33721622, "SESSION_END"),
+            equity_points=[6000.0, 5989.6706342],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, pnl=pnl)
+
+        self.assertIn("Campuran / Perlu Review", html)
+        self.assertIn("saldo demo terakhir turun", html)
+        self.assertIn("Aksi berikut", html)
+        self.assertIn("Equity Change", html)
 
     def test_demo_walkthrough_renders_numbered_beginner_steps(self) -> None:
         walkthrough = [

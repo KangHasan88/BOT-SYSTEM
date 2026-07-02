@@ -1046,6 +1046,12 @@ def build_orchestrator_page(
     .pnl-line {{ fill: none; stroke: var(--focus); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }}
     .pnl-fill {{ fill: rgba(18, 59, 122, 0.10); }}
     .pnl-zero {{ stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 4 4; }}
+    .pnl-summary {{ border: 1px solid var(--soft-line); border-radius: 10px; background: #f8fafc; padding: 12px; margin-bottom: 12px; }}
+    .pnl-summary-head {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 800; }}
+    .pnl-summary p {{ margin: 0 0 8px; color: #475569; font-size: 13px; line-height: 1.5; }}
+    .pnl-guide {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }}
+    .pnl-guide div {{ border: 1px solid #e3ebf5; border-radius: 8px; background: #fff; padding: 9px; font-size: 12px; color: #475569; line-height: 1.4; }}
+    .pnl-guide strong {{ display: block; color: #334155; margin-bottom: 4px; }}
     .pnl-table-wrap {{ overflow-x: auto; }}
     .walkthrough {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }}
     .walk-step {{ min-height: 172px; border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }}
@@ -1859,6 +1865,7 @@ def _paper_pnl_text(reason: str) -> str:
 
 def _pnl_panel_html(panel: PnlPanel) -> str:
     pnl_css = "ok" if panel.net_pnl >= 0 else "danger"
+    summary_html = _pnl_summary_html(panel)
     latest_trade = panel.latest_trade
     trade_rows = ""
     if latest_trade is not None:
@@ -1876,6 +1883,8 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
     else:
         trade_rows = '<tr><td colspan="7">Belum ada trade paper.</td></tr>'
     return (
+        summary_html
+        +
         '<div class="pnl-layout">'
         '<div>'
         '<div class="grid">'
@@ -1896,6 +1905,63 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         '<table class="data-table">'
         "<thead><tr><th>Waktu Exit</th><th>Symbol</th><th>TF</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Alasan Exit</th></tr></thead>"
         f"<tbody>{trade_rows}</tbody></table></div>"
+    )
+
+
+def _pnl_summary_html(panel: PnlPanel) -> str:
+    status, css, summary, next_action = _pnl_plain_status(panel)
+    return (
+        '<div class="pnl-summary">'
+        + '<div class="pnl-summary-head">'
+        + "<span>Kesimpulan Awam</span>"
+        + f'<span class="badge {css}">{escape(status)}</span>'
+        + "</div>"
+        + f"<p>{escape(summary)}</p>"
+        + f"<p><strong>Aksi berikut:</strong> {escape(next_action)}</p>"
+        + '<div class="pnl-guide">'
+        + "<div><strong>Realized P/L Demo</strong>Total profit/rugi dari trade yang sudah selesai.</div>"
+        + "<div><strong>Equity Terakhir</strong>Saldo simulasi terakhir. Ini yang paling dekat dengan kondisi akun demo.</div>"
+        + "<div><strong>Equity Change</strong>Persentase saldo naik/turun dari awal. Minus berarti saldo demo sedang turun.</div>"
+        + "<div><strong>Win Rate</strong>Persentase trade menang. Win rate tinggi belum tentu aman kalau loss lebih besar.</div>"
+        + "</div>"
+        + "</div>"
+    )
+
+
+def _pnl_plain_status(panel: PnlPanel) -> tuple[str, str, str, str]:
+    if panel.trade_count == 0:
+        return (
+            "Belum Ada Trade",
+            "warn",
+            "Bot belum punya trade paper/demo untuk dibaca. Belum bisa dinilai profit atau loss.",
+            "Klik Demo Data atau jalankan siklus paper dulu.",
+        )
+    if panel.equity_change_pct >= 0 and panel.net_pnl >= 0:
+        return (
+            "Profit Demo",
+            "ok",
+            f"Saldo demo naik {panel.equity_change_pct:.2f}% dari awal dan total realized P/L positif {panel.net_pnl:.8f}.",
+            "Lanjut pantau, jangan naik ke real live sebelum evidence paper cukup.",
+        )
+    if panel.equity_change_pct < 0 and panel.net_pnl <= 0:
+        return (
+            "Loss Demo",
+            "danger",
+            f"Saldo demo turun {abs(panel.equity_change_pct):.2f}% dari awal dan total realized P/L negatif {panel.net_pnl:.8f}.",
+            "Pause eksperimen ini, cek trade terakhir, risk guard, dan market regime.",
+        )
+    if panel.equity_change_pct < 0 and panel.net_pnl > 0:
+        return (
+            "Campuran / Perlu Review",
+            "warn",
+            f"Trade tertutup masih mencatat realized P/L positif {panel.net_pnl:.8f}, tapi saldo demo terakhir turun {abs(panel.equity_change_pct):.2f}% dari awal.",
+            "Anggap belum aman. Review equity curve, fees, dan trade terakhir sebelum percaya strategi.",
+        )
+    return (
+        "Campuran / Perlu Review",
+        "warn",
+        f"Saldo demo naik {panel.equity_change_pct:.2f}%, tapi realized P/L total masih negatif {panel.net_pnl:.8f}.",
+        "Review data akun dan trade detail sebelum mengambil kesimpulan.",
     )
 
 

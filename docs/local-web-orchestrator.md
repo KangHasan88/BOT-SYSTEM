@@ -257,6 +257,23 @@ Panel `P/L Visual Monitor` membaca hasil paper/demo dari file `account.csv` dan
 - mini equity curve;
 - trade terakhir.
 
+Untuk user awam, panel juga menampilkan `Kesimpulan Awam`:
+
+- `Profit Demo`: saldo simulasi naik dan realized P/L positif.
+- `Loss Demo`: saldo simulasi turun dan realized P/L negatif.
+- `Campuran / Perlu Review`: salah satu angka bagus tetapi angka lain belum
+  aman, misalnya realized P/L positif tetapi equity terakhir masih turun dari
+  saldo awal.
+
+Cara baca cepat:
+
+- `Equity Terakhir` adalah saldo simulasi terakhir.
+- `Equity Change` adalah naik/turun saldo dari awal. Minus berarti saldo demo
+  sedang turun.
+- `Realized P/L Demo` adalah total profit/rugi dari trade yang sudah selesai.
+- `Win Rate` hanya persentase trade menang; tidak otomatis berarti strategi
+  aman.
+
 Semua angka di panel ini berasal dari simulasi paper/demo, bukan real-money
 live account. Data yang sama tersedia sebagai JSON di:
 
