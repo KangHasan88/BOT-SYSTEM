@@ -333,6 +333,16 @@ class PnlTradeRow:
 
 
 @dataclass(frozen=True)
+class DailyPnlRow:
+    date: str
+    trade_count: int
+    net_pnl: float
+    best_trade_pnl: float
+    worst_trade_pnl: float
+    result: str
+
+
+@dataclass(frozen=True)
 class PnlPanel:
     trade_count: int
     win_rate_pct: float
@@ -344,6 +354,7 @@ class PnlPanel:
     worst_trade_pnl: float
     latest_trade: PnlTradeRow | None
     equity_points: list[float]
+    daily_rows: list[DailyPnlRow]
 
 
 @dataclass(frozen=True)
@@ -829,6 +840,7 @@ def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPan
         worst_trade_pnl=min((trade.net_pnl for trade in trades), default=0.0),
         latest_trade=trades[-1] if trades else None,
         equity_points=equity_points,
+        daily_rows=_aggregate_daily_pnl_rows(trades),
     )
 
 
@@ -1057,7 +1069,7 @@ def build_orchestrator_page(
     human_feedback = human_feedback or HumanFeedbackPanel("", False, "MISSING", "", "", 0, 0, "-", "", "Feedback is review-only. No live orders.", [], {}, [], [])
     fundamental = fundamental or FundamentalPanel("", False, "MISSING", "", "", 0, 0, "LOW", "green", "", "Fundamental lane is review-only. No live orders.", {}, {}, [])
     experiment_scoreboard = experiment_scoreboard or ExperimentScoreboardPanel("", False, "MISSING", "", "", 0, "-", "", "Experiment registry is review-only. No live orders.", [])
-    pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
+    pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [], [])
     market_feed = market_feed or MarketFeedPanel([])
     paper_execution = paper_execution or PaperExecutionPanel(0, 0, 0, None, [])
     walkthrough = walkthrough or []
@@ -1161,6 +1173,7 @@ def build_orchestrator_page(
     .pnl-summary-head {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 800; }}
     .pnl-summary p {{ margin: 0 0 8px; color: #475569; font-size: 13px; line-height: 1.5; }}
     .pnl-table-wrap {{ overflow-x: auto; }}
+    .pnl-table-wrap h3 {{ margin: 0 0 8px; font-size: 13px; color: #334155; }}
     .walkthrough {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }}
     .walk-step {{ min-height: 172px; border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }}
     .walk-head {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
@@ -2008,6 +2021,7 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         )
     else:
         trade_rows = '<tr><td colspan="7">Belum ada trade paper.</td></tr>'
+    daily_html = _daily_pnl_html(panel.daily_rows)
     return (
         summary_html
         +
@@ -2049,6 +2063,11 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         "</div>"
         "</div>"
         '<div class="pnl-table-wrap">'
+        "<h3>History P/L Harian</h3>"
+        f"{daily_html}"
+        "</div>"
+        '<div class="pnl-table-wrap">'
+        "<h3>Trade Terakhir</h3>"
         '<table class="data-table">'
         "<thead><tr><th>Waktu Exit</th><th>Symbol</th><th>TF</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Alasan Exit</th></tr></thead>"
         f"<tbody>{trade_rows}</tbody></table></div>"
@@ -2079,6 +2098,33 @@ def _market_feed_html(panel: MarketFeedPanel) -> str:
         '<table class="data-table">'
         "<thead><tr><th>Symbol</th><th>TF</th><th>Status</th><th>Candles</th><th>Candle Terakhir UTC</th><th>Close</th><th>Source</th><th>Arti</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _daily_pnl_html(rows: list[DailyPnlRow]) -> str:
+    if not rows:
+        return (
+            '<table class="data-table">'
+            '<thead><tr><th>Tanggal</th><th>Trades</th><th>Net P/L</th><th>Best</th><th>Worst</th><th>Hasil</th></tr></thead>'
+            '<tbody><tr><td colspan="6">Belum ada history P/L harian.</td></tr></tbody></table>'
+        )
+    body = []
+    for row in rows:
+        css = "ok" if row.net_pnl > 0 else "danger" if row.net_pnl < 0 else "warn"
+        body.append(
+            "<tr>"
+            f"<td>{escape(row.date)}</td>"
+            f"<td>{row.trade_count}</td>"
+            f'<td><span class="badge {css}">{row.net_pnl:.8f}</span></td>'
+            f"<td>{row.best_trade_pnl:.8f}</td>"
+            f"<td>{row.worst_trade_pnl:.8f}</td>"
+            f"<td>{escape(row.result)}</td>"
+            "</tr>"
+        )
+    return (
+        '<table class="data-table">'
+        '<thead><tr><th>Tanggal</th><th>Trades</th><th>Net P/L</th><th>Best</th><th>Worst</th><th>Hasil</th></tr></thead>'
+        f"<tbody>{''.join(body)}</tbody></table>"
     )
 
 
@@ -3098,6 +3144,28 @@ def _load_paper_trade_rows(root: Path) -> list[PnlTradeRow]:
                 except ValueError:
                     continue
     return sorted(rows, key=lambda trade: trade.exit_time)
+
+
+def _aggregate_daily_pnl_rows(trades: list[PnlTradeRow]) -> list[DailyPnlRow]:
+    buckets: dict[str, list[PnlTradeRow]] = {}
+    for trade in trades:
+        date = trade.exit_time.split("T", 1)[0] if trade.exit_time else "-"
+        buckets.setdefault(date, []).append(trade)
+    rows: list[DailyPnlRow] = []
+    for date, day_trades in sorted(buckets.items(), reverse=True):
+        net_pnl = sum(trade.net_pnl for trade in day_trades)
+        result = "Profit" if net_pnl > 0 else "Loss" if net_pnl < 0 else "Flat"
+        rows.append(
+            DailyPnlRow(
+                date=date,
+                trade_count=len(day_trades),
+                net_pnl=net_pnl,
+                best_trade_pnl=max(trade.net_pnl for trade in day_trades),
+                worst_trade_pnl=min(trade.net_pnl for trade in day_trades),
+                result=result,
+            )
+        )
+    return rows
 
 
 def _load_paper_order_rows(root: Path) -> list[PaperExecutionRow]:

@@ -15,6 +15,7 @@ from trading_bot.orchestrator import (
     LearningDashboardPanel,
     LiveEvidencePanel,
     LocalDemoPanel,
+    DailyPnlRow,
     MarketFeedPanel,
     MarketFeedRow,
     PaperCampaignPanel,
@@ -367,6 +368,7 @@ class OrchestratorTest(unittest.TestCase):
             worst_trade_pnl=-1.5,
             latest_trade=PnlTradeRow("BTC/USDT", "15m", "2026-07-01T00:00+00:00", 100.0, 105.0, 14.0, "SESSION_END"),
             equity_points=[1000.0, 1004.0, 1012.5],
+            daily_rows=[DailyPnlRow("2026-07-01", 2, 12.5, 14.0, -1.5, "Profit")],
         )
         status = load_orchestrator_status("config/bot.sample.toml")
 
@@ -380,6 +382,8 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Saldo simulasi terakhir. Ini yang paling dekat", html)
         self.assertNotIn("pnl-guide", html)
         self.assertIn("Equity curve demo", html)
+        self.assertIn("History P/L Harian", html)
+        self.assertIn("2026-07-01", html)
         self.assertIn("BTC/USDT", html)
         self.assertIn("SESSION_END", html)
 
@@ -395,6 +399,7 @@ class OrchestratorTest(unittest.TestCase):
             worst_trade_pnl=-3.04754787,
             latest_trade=PnlTradeRow("ETH/USDT", "4h", "2024-08-23T09:33+00:00", 3827.62, 4234.67, 27.33721622, "SESSION_END"),
             equity_points=[6000.0, 5989.6706342],
+            daily_rows=[DailyPnlRow("2024-08-23", 19, 187.61379981, 36.34904994, -3.04754787, "Profit")],
         )
         status = load_orchestrator_status("config/bot.sample.toml")
 
@@ -421,6 +426,7 @@ class OrchestratorTest(unittest.TestCase):
             worst_trade_pnl=-2.0,
             latest_trade=PnlTradeRow("BTC/USDT", "15m", "2026-07-01T00:00+00:00", 100.0, 105.0, 20.0, "TP"),
             equity_points=[1000.0, 1025.0],
+            daily_rows=[DailyPnlRow("2026-07-01", 3, 25.0, 20.0, -2.0, "Profit")],
         )
         status = load_orchestrator_status("config/bot.sample.toml")
 
@@ -1031,21 +1037,26 @@ class OrchestratorTest(unittest.TestCase):
             (paper_root / "account.csv").write_text(
                 "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
                 "1717200000000,1000,1000,1000,0,0,OPEN,\n"
-                "1717200900000,1008,1000,1000,0,0,OPEN,\n",
+                "1717200900000,1008,1000,1000,0,0,OPEN,\n"
+                "1717287300000,1003,1008,1000,0,1,OPEN,\n",
                 encoding="utf-8",
             )
             (paper_root / "trades.csv").write_text(
                 "symbol,timeframe,entry_time_ms,exit_time_ms,entry_price,exit_price,quantity,gross_pnl,fees,net_pnl,exit_reason\n"
-                "BTC/USDT,15m,1717200000000,1717200900000,100,108,1,8,0,8,SESSION_END\n",
+                "BTC/USDT,15m,1717200000000,1717200900000,100,108,1,8,0,8,SESSION_END\n"
+                "BTC/USDT,15m,1717286400000,1717287300000,108,103,1,-5,0,-5,STOP_LOSS\n",
                 encoding="utf-8",
             )
 
             panel = load_pnl_panel(config_path)
 
-        self.assertEqual(1, panel.trade_count)
-        self.assertEqual(100.0, panel.win_rate_pct)
-        self.assertEqual(8.0, panel.net_pnl)
-        self.assertEqual(1008.0, panel.latest_equity)
+        self.assertEqual(2, panel.trade_count)
+        self.assertEqual(50.0, panel.win_rate_pct)
+        self.assertEqual(3.0, panel.net_pnl)
+        self.assertEqual(1003.0, panel.latest_equity)
+        self.assertEqual(2, len(panel.daily_rows))
+        self.assertEqual("Loss", panel.daily_rows[0].result)
+        self.assertEqual("Profit", panel.daily_rows[1].result)
 
     def test_incident_panel_and_web_kill_switch_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

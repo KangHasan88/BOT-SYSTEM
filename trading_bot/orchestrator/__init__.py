@@ -3,6 +3,7 @@
 from trading_bot.orchestrator.local_web import (
     ACTIONS,
     DatabasePanel,
+    DailyPnlRow,
     DemoWalkthroughStep,
     ExperimentScoreboardPanel,
     FundamentalPanel,
@@ -61,6 +62,7 @@ from trading_bot.orchestrator.local_web import (
 __all__ = [
     "ACTIONS",
     "DatabasePanel",
+    "DailyPnlRow",
     "DemoWalkthroughStep",
     "ExperimentScoreboardPanel",
     "FundamentalPanel",
