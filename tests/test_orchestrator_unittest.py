@@ -20,6 +20,7 @@ from trading_bot.orchestrator import (
     PaperCampaignPanel,
     PaperExecutionPanel,
     PaperExecutionRow,
+    PaperPositionSnapshot,
     PatternMemoryPanel,
     SkillLoopPanel,
     PnlPanel,
@@ -176,6 +177,13 @@ class OrchestratorTest(unittest.TestCase):
                 "BTC/USDT,15m,1710000900000,buy,OPEN,101,0,0,0,REJECTED,outside entry window\n",
                 encoding="utf-8",
             )
+            account_path = data_root / "paper" / "BTC_USDT" / "15m" / "account.csv"
+            account_path.write_text(
+                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
+                "1710000000000,1000,1000,1000,0,0,OPEN,paper session started\n"
+                "1710000900000,1002.5,1000,1000,1,0,OPEN,position still open\n",
+                encoding="utf-8",
+            )
 
             panel = load_paper_execution_panel(config_path)
             html = build_orchestrator_page(load_orchestrator_status(config_path), paper_execution=panel)
@@ -183,7 +191,12 @@ class OrchestratorTest(unittest.TestCase):
         self.assertEqual(2, panel.order_count)
         self.assertEqual(1, panel.filled_count)
         self.assertEqual(1, panel.rejected_count)
+        self.assertIsNotNone(panel.latest_snapshot)
+        self.assertEqual(1, panel.latest_snapshot.open_positions if panel.latest_snapshot else 0)
         self.assertIn("Paper Execution", html)
+        self.assertIn("Posisi Paper", html)
+        self.assertIn("1 terbuka", html)
+        self.assertIn("1002.50000000", html)
         self.assertIn("outside entry window", html)
         self.assertIn("risk approved", html)
 

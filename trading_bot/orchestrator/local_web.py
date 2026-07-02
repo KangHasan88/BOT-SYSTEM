@@ -379,10 +379,21 @@ class PaperExecutionRow:
 
 
 @dataclass(frozen=True)
+class PaperPositionSnapshot:
+    time_utc: str
+    equity: float
+    day_start_equity: float
+    open_positions: int
+    trading_status: str
+    status_reason: str
+
+
+@dataclass(frozen=True)
 class PaperExecutionPanel:
     order_count: int
     filled_count: int
     rejected_count: int
+    latest_snapshot: PaperPositionSnapshot | None
     latest_rows: list[PaperExecutionRow]
 
 
@@ -440,7 +451,8 @@ def load_market_feed_panel(config_path: str | Path = "config/bot.sample.toml") -
 
 def load_paper_execution_panel(config_path: str | Path = "config/bot.sample.toml", limit: int = 8) -> PaperExecutionPanel:
     config = load_config(Path(config_path))
-    rows = _load_paper_order_rows(Path(config.data_root) / "paper")
+    paper_root = Path(config.data_root) / "paper"
+    rows = _load_paper_order_rows(paper_root)
     filled = sum(1 for row in rows if row.status == "FILLED")
     rejected = sum(1 for row in rows if row.status == "REJECTED")
     latest = sorted(rows, key=lambda row: row.time_utc, reverse=True)[:limit]
@@ -448,6 +460,7 @@ def load_paper_execution_panel(config_path: str | Path = "config/bot.sample.toml
         order_count=len(rows),
         filled_count=filled,
         rejected_count=rejected,
+        latest_snapshot=_load_latest_position_snapshot(paper_root),
         latest_rows=latest,
     )
 
@@ -1046,7 +1059,7 @@ def build_orchestrator_page(
     experiment_scoreboard = experiment_scoreboard or ExperimentScoreboardPanel("", False, "MISSING", "", "", 0, "-", "", "Experiment registry is review-only. No live orders.", [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     market_feed = market_feed or MarketFeedPanel([])
-    paper_execution = paper_execution or PaperExecutionPanel(0, 0, 0, [])
+    paper_execution = paper_execution or PaperExecutionPanel(0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
     activity_html = _activity_html(activities)
@@ -2070,11 +2083,20 @@ def _market_feed_html(panel: MarketFeedPanel) -> str:
 
 
 def _paper_execution_html(panel: PaperExecutionPanel) -> str:
+    snapshot = panel.latest_snapshot
+    position_css = "warn" if snapshot and snapshot.open_positions else "ok"
+    position_text = f"{snapshot.open_positions} terbuka" if snapshot else "belum ada"
+    equity_text = f"{snapshot.equity:.8f}" if snapshot else "-"
+    status_text = snapshot.trading_status if snapshot else "MISSING"
+    status_reason = snapshot.status_reason if snapshot and snapshot.status_reason else "Belum ada snapshot akun paper."
     summary = (
         '<div class="grid">'
         + _metric("Paper Orders", panel.order_count, "Total order simulasi yang tercatat.")
         + _metric("Filled", f'<span class="badge ok">{panel.filled_count}</span>', "Order simulasi yang berhasil dieksekusi.")
         + _metric("Rejected", f'<span class="badge warn">{panel.rejected_count}</span>', "Order simulasi yang ditolak risk/session guard.")
+        + _metric("Posisi Paper", f'<span class="badge {position_css}">{escape(position_text)}</span>', "Jumlah posisi simulasi yang masih terbuka.")
+        + _metric("Equity Paper", equity_text, "Saldo simulasi terakhir dari account snapshot.")
+        + _metric("Status Trading", escape(status_text), status_reason)
         + "</div>"
     )
     if not panel.latest_rows:
@@ -3106,6 +3128,37 @@ def _load_paper_order_rows(root: Path) -> list[PaperExecutionRow]:
                 except ValueError:
                     continue
     return sorted(rows, key=lambda order: order.time_utc)
+
+
+def _load_latest_position_snapshot(root: Path) -> PaperPositionSnapshot | None:
+    snapshots: list[tuple[int, PaperPositionSnapshot]] = []
+    if not root.exists():
+        return None
+    for path in root.rglob("account.csv"):
+        if not path.exists() or path.stat().st_size == 0:
+            continue
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    open_time_ms = int(row.get("open_time_ms", 0) or 0)
+                    snapshots.append(
+                        (
+                            open_time_ms,
+                            PaperPositionSnapshot(
+                                time_utc=_format_ms(open_time_ms),
+                                equity=float(row.get("equity", 0) or 0),
+                                day_start_equity=float(row.get("day_start_equity", 0) or 0),
+                                open_positions=int(row.get("open_positions", 0) or 0),
+                                trading_status=str(row.get("trading_status", "") or "UNKNOWN"),
+                                status_reason=str(row.get("status_reason", "") or ""),
+                            ),
+                        )
+                    )
+                except ValueError:
+                    continue
+    if not snapshots:
+        return None
+    return sorted(snapshots, key=lambda item: item[0])[-1][1]
 
 
 def _load_equity_series(root: Path) -> list[list[float]]:
