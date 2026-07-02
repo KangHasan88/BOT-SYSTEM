@@ -1026,7 +1026,7 @@ def build_orchestrator_page(
     .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }}
     .panel {{ background: var(--panel); border: 1px solid var(--soft-line); border-radius: 12px; box-shadow: var(--shadow); padding: 15px; margin-bottom: 14px; }}
     .panel h2 {{ margin: 0 0 12px; font-size: 15px; font-weight: 800; color: #334155; }}
-    .metric {{ min-height: 86px; }}
+    .metric {{ min-height: 118px; display: flex; flex-direction: column; }}
     .metric > span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 8px; }}
     .metric strong {{ display: block; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }}
     .metric-value-line {{ display: block; color: var(--text); }}
@@ -1034,6 +1034,7 @@ def build_orchestrator_page(
     .metric-note.delta-ok {{ color: var(--good); }}
     .metric-note.delta-danger {{ color: var(--bad); }}
     .metric-note.delta-flat {{ color: var(--muted); }}
+    .metric-desc {{ margin-top: auto; padding-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 600; }}
     .beginner-summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }}
     .beginner-chip {{ border: 1px solid var(--soft-line); border-radius: 10px; padding: 11px; background: #f8fafc; min-height: 72px; }}
     .beginner-chip span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 6px; }}
@@ -1054,9 +1055,6 @@ def build_orchestrator_page(
     .pnl-summary {{ border: 1px solid var(--soft-line); border-radius: 10px; background: #f8fafc; padding: 12px; margin-bottom: 12px; }}
     .pnl-summary-head {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 800; }}
     .pnl-summary p {{ margin: 0 0 8px; color: #475569; font-size: 13px; line-height: 1.5; }}
-    .pnl-guide {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }}
-    .pnl-guide div {{ border: 1px solid #e3ebf5; border-radius: 8px; background: #fff; padding: 9px; font-size: 12px; color: #475569; line-height: 1.4; }}
-    .pnl-guide strong {{ display: block; color: #334155; margin-bottom: 4px; }}
     .pnl-table-wrap {{ overflow-x: auto; }}
     .walkthrough {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }}
     .walk-step {{ min-height: 172px; border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 8px; }}
@@ -1604,13 +1602,15 @@ def _svg_icon(name: str) -> str:
     return icons.get(name, icons["play"])
 
 
-def _metric(label: str, value: object) -> str:
+def _metric(label: str, value: object, note: str = "") -> str:
     title = _help_text_for(str(label))
     title_attr = f' title="{escape(title)}"' if title else ""
+    note_html = f'<div class="metric-desc">{escape(note)}</div>' if note else ""
     return (
         f'<div class="panel metric"{title_attr}>'
         f"<span>{escape(str(label))}</span>"
         f"<strong>{value if str(value).startswith('<') else escape(str(value))}</strong>"
+        f"{note_html}"
         "</div>"
     )
 
@@ -1895,16 +1895,33 @@ def _pnl_panel_html(panel: PnlPanel) -> str:
         '<div class="pnl-layout">'
         '<div>'
         '<div class="grid">'
-        + _metric("Realized P/L Demo", f'<span class="badge {pnl_css}">{panel.net_pnl:.8f}</span>')
-        + _metric("Win Rate", f"{panel.win_rate_pct:.2f}%")
-        + _metric("Trades", panel.trade_count)
-        + _metric("Equity Terakhir", f"{panel.latest_equity:.8f}")
+        + _metric(
+            "Realized P/L Demo",
+            f'<span class="badge {pnl_css}">{panel.net_pnl:.8f}</span>',
+            "Total profit/rugi dari trade yang sudah selesai.",
+        )
+        + _metric(
+            "Win Rate",
+            f"{panel.win_rate_pct:.2f}%",
+            "Persentase trade menang. Tinggi belum tentu aman jika loss lebih besar.",
+        )
+        + _metric("Trades", panel.trade_count, "Jumlah trade paper/demo yang sudah tercatat.")
+        + _metric(
+            "Equity Terakhir",
+            f"{panel.latest_equity:.8f}",
+            "Saldo simulasi terakhir. Ini yang paling dekat dengan kondisi akun demo.",
+        )
         + _metric(
             "Equity Change",
             f'<span class="metric-value-line">{panel.equity_change_pct:.2f}%</span>'
             f'<span class="metric-note {equity_delta_css}">{escape(equity_delta_text)}</span>',
+            "Persentase saldo naik/turun dari awal.",
         )
-        + _metric("Best/Worst Trade", f"{panel.best_trade_pnl:.8f} / {panel.worst_trade_pnl:.8f}")
+        + _metric(
+            "Best/Worst Trade",
+            f"{panel.best_trade_pnl:.8f} / {panel.worst_trade_pnl:.8f}",
+            "Trade terbaik dan terburuk dari simulasi.",
+        )
         + "</div>"
         "</div>"
         '<div class="pnl-chart" title="Garis ini menunjukkan naik-turun saldo demo/paper dari waktu ke waktu.">'
@@ -1933,12 +1950,6 @@ def _pnl_summary_html(panel: PnlPanel) -> str:
         + f"<p><strong>Hitungan saldo:</strong> {escape(equity_delta_text)}</p>"
         + f"<p><strong>Satuan:</strong> {escape(currency_label)}. Ini bukan Rupiah kecuali bot memang memakai pair IDR.</p>"
         + f"<p><strong>Aksi berikut:</strong> {escape(next_action)}</p>"
-        + '<div class="pnl-guide">'
-        + "<div><strong>Realized P/L Demo</strong>Total profit/rugi dari trade yang sudah selesai.</div>"
-        + "<div><strong>Equity Terakhir</strong>Saldo simulasi terakhir. Ini yang paling dekat dengan kondisi akun demo.</div>"
-        + "<div><strong>Equity Change</strong>Persentase saldo naik/turun dari awal. Minus berarti saldo demo sedang turun.</div>"
-        + "<div><strong>Win Rate</strong>Persentase trade menang. Win rate tinggi belum tentu aman kalau loss lebih besar.</div>"
-        + "</div>"
         + "</div>"
     )
 
