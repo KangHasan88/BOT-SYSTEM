@@ -375,6 +375,11 @@ class OrchestratorTest(unittest.TestCase):
         html = build_orchestrator_page(status, pnl=pnl)
 
         self.assertIn("P/L Visual Monitor", html)
+        self.assertIn("pnl-refresh-now", html)
+        self.assertIn("pnl-panel-body", html)
+        self.assertIn("Auto refresh P/L", html)
+        self.assertIn("/api/pnl-html", html)
+        self.assertIn("setInterval(refreshPnlPanel, 15000)", html)
         self.assertIn("Kesimpulan Awam", html)
         self.assertIn("Profit Demo", html)
         self.assertIn("Realized P/L Demo", html)

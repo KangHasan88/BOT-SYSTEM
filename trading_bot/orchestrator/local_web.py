@@ -1315,7 +1315,11 @@ def build_orchestrator_page(
     </section>
     <section class="panel" id="pnl-monitor">
       <h2>P/L Visual Monitor</h2>
-      <div>{pnl_html}</div>
+      <div class="filters">
+        <button type="button" class="btn" id="pnl-refresh-now">{_svg_icon("refresh")}Refresh P/L</button>
+        <span class="small" id="pnl-refresh-status">Auto refresh siap. Panel ini update tiap 15 detik.</span>
+      </div>
+      <div id="pnl-panel-body">{pnl_html}</div>
       <p class="small">Semua angka di panel ini berasal dari paper/demo trading, bukan uang asli.</p>
     </section>
     <section class="grid">
@@ -1431,6 +1435,21 @@ def build_orchestrator_page(
       document.getElementById('audit').innerHTML = payload.html;
     }}
     document.getElementById('audit-refresh').addEventListener('click', loadAudit);
+    async function refreshPnlPanel() {{
+      const target = document.getElementById('pnl-panel-body');
+      const status = document.getElementById('pnl-refresh-status');
+      if (!target) return;
+      try {{
+        const res = await fetch('/api/pnl-html', {{cache: 'no-store'}});
+        if (!res.ok) throw new Error(`HTTP ${{res.status}}`);
+        target.innerHTML = await res.text();
+        if (status) status.textContent = `Auto refresh P/L terakhir: ${{new Date().toLocaleTimeString('id-ID')}}`;
+      }} catch (error) {{
+        if (status) status.textContent = `Auto refresh P/L gagal: ${{error.message || 'request error'}}`;
+      }}
+    }}
+    const pnlRefreshButton = document.getElementById('pnl-refresh-now');
+    if (pnlRefreshButton) pnlRefreshButton.addEventListener('click', refreshPnlPanel);
     async function postKillSwitch(action) {{
       const reason = document.getElementById('kill-reason').value;
       const res = await fetch('/api/kill-switch', {{
@@ -1448,6 +1467,7 @@ def build_orchestrator_page(
     document.getElementById('kill-activate').addEventListener('click', () => postKillSwitch('activate'));
     document.getElementById('kill-clear').addEventListener('click', () => postKillSwitch('clear'));
     setInterval(() => fetch('/api/status').catch(() => null), 15000);
+    setInterval(refreshPnlPanel, 15000);
     setInterval(loadAudit, 30000);
   </script>
 </body>
@@ -1527,6 +1547,9 @@ def _handler_factory(config_path: Path):
                     return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
+                    return
+                if parsed.path == "/api/pnl-html":
+                    self._html_response(_pnl_panel_html(load_pnl_panel(config_path)))
                     return
                 if parsed.path == "/api/walkthrough":
                     self._json_response([asdict(step) for step in load_demo_walkthrough(config_path)])
