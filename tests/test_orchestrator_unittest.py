@@ -311,6 +311,10 @@ class OrchestratorTest(unittest.TestCase):
         walkthrough = [
             DemoWalkthroughStep(1, "Buka Web Lokal", "PASS", "Buka halaman browser.", "Buka 127.0.0.1:8000", "Jika refused, start server."),
             DemoWalkthroughStep(2, "Cek Config", "TODO", "Pastikan config aman.", "Klik Validasi Config", "Ini belum trading."),
+            DemoWalkthroughStep(3, "Isi Data Demo", "TODO", "Siapkan data demo.", "Klik Demo Data", "Ini belum live."),
+            DemoWalkthroughStep(4, "Jalankan Evidence", "TODO", "Refresh evidence.", "Klik Evidence Campaign", "Ini cek bukti."),
+            DemoWalkthroughStep(5, "Pantau P/L", "TODO", "Pantau P/L demo.", "Lihat P/L Visual Monitor", "Ini saldo simulasi."),
+            DemoWalkthroughStep(6, "Review Go Live", "TODO", "Review blocker.", "Klik Live Evidence", "Live tetap terkunci."),
         ]
         status = load_orchestrator_status("config/bot.sample.toml")
 
@@ -318,7 +322,10 @@ class OrchestratorTest(unittest.TestCase):
 
         self.assertIn("Demo Walkthrough", html)
         self.assertIn("Buka Web Lokal", html)
-        self.assertIn("Klik Validasi Config", html)
+        self.assertIn('data-scroll="mulai-di-sini"', html)
+        self.assertIn('data-action="validate_config"', html)
+        self.assertIn('data-action="seed_demo_data"', html)
+        self.assertIn('data-scroll="pnl-monitor"', html)
         self.assertIn("Ikuti urutan ini", html)
 
     def test_demo_walkthrough_loader_reports_safe_demo_path(self) -> None:

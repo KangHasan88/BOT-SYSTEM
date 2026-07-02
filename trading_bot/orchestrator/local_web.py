@@ -1053,7 +1053,8 @@ def build_orchestrator_page(
     .walk-title {{ display: flex; align-items: center; gap: 8px; min-width: 0; }}
     .walk-number {{ width: 28px; height: 28px; border-radius: 999px; background: var(--focus); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none; }}
     .walk-goal {{ color: #475569; font-size: 13px; line-height: 1.45; flex: 1; }}
-    .walk-action {{ color: var(--muted); font-size: 12px; font-weight: 800; }}
+    .walk-action {{ margin-top: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
+    .walk-action .btn {{ background: #f8fafc; border: 1px solid var(--soft-line); }}
     .start-guide {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }}
     .start-card {{ border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; min-height: 158px; display: flex; flex-direction: column; gap: 8px; }}
     .start-card-head {{ display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: #334155; }}
@@ -1112,12 +1113,12 @@ def build_orchestrator_page(
         <div class="toolbar-group">{action_buttons}</div>
       </div>
     </section>
-    <section class="panel">
+    <section class="panel" id="mulai-di-sini">
       <h2>Mulai di Sini</h2>
       <div>{getting_started_html}</div>
       <p class="small">Menu ini adalah urutan instalasi dan langkah awal untuk menjalankan bot demo/paper di laptop.</p>
     </section>
-    <section class="panel">
+    <section class="panel" id="control-room">
       <h2>Control Room Awam</h2>
       <div>{beginner_html}</div>
     </section>
@@ -1125,12 +1126,12 @@ def build_orchestrator_page(
       <h2>Kamus Awam</h2>
       <div>{glossary_html}</div>
     </section>
-    <section class="panel">
+    <section class="panel" id="demo-walkthrough">
       <h2>Demo Walkthrough</h2>
       <div>{walkthrough_html}</div>
       <p class="small">Ikuti urutan ini untuk demo lokal yang aman. Semua langkah tetap paper/demo dan read-only untuk live.</p>
     </section>
-    <section class="panel">
+    <section class="panel" id="local-demo">
       <h2>Local Demo Readiness</h2>
       <div>{local_demo_html}</div>
       <p class="small">Panel ini memastikan demo lokal siap dipakai tanpa real-money live execution.</p>
@@ -1175,7 +1176,7 @@ def build_orchestrator_page(
       <div>{experiment_scoreboard_html}</div>
       <p class="small">Score tinggi hanya boleh naik ke backtest/paper review, bukan langsung live.</p>
     </section>
-    <section class="panel">
+    <section class="panel" id="pnl-monitor">
       <h2>P/L Visual Monitor</h2>
       <div>{pnl_html}</div>
       <p class="small">Semua angka di panel ini berasal dari paper/demo trading, bukan uang asli.</p>
@@ -1213,7 +1214,7 @@ def build_orchestrator_page(
       <div>{testnet_demo_html}</div>
       <p class="small">Panel ini read-only dari report demo/testnet. Tidak ada real live order di sini.</p>
     </section>
-    <section class="panel">
+    <section class="panel" id="live-evidence">
       <h2>Live Evidence Gate</h2>
       <div>{live_evidence_html}</div>
       <p class="small">Gate ini mengunci real live sampai semua bukti paper, QA, testnet, dan owner review lengkap.</p>
@@ -1275,6 +1276,12 @@ def build_orchestrator_page(
           body: JSON.stringify({{action: button.dataset.action, limit: Number(document.getElementById('limit').value || 10)}})
         }});
         await refresh();
+      }});
+    }}
+    for (const button of document.querySelectorAll('button[data-scroll]')) {{
+      button.addEventListener('click', () => {{
+        const target = document.getElementById(button.dataset.scroll);
+        if (target) target.scrollIntoView({{behavior: 'smooth', block: 'start'}});
       }});
     }}
     async function loadAudit() {{
@@ -1910,10 +1917,38 @@ def _demo_walkthrough_html(steps: list[DemoWalkthroughStep]) -> str:
             + f'<span class="badge {css}">{escape(step.status)}</span>'
             + "</div>"
             + f'<div class="walk-goal">{escape(step.goal)}</div>'
-            + f'<div class="walk-action">{escape(step.action_label)}</div>'
+            + '<div class="walk-action">'
+            + _walkthrough_button(step)
+            + "</div>"
             + "</div>"
         )
     return '<div class="walkthrough">' + "".join(cards) + "</div>"
+
+
+def _walkthrough_button(step: DemoWalkthroughStep) -> str:
+    action_by_step = {
+        2: "validate_config",
+        3: "seed_demo_data",
+        4: "evidence_campaign",
+        6: "live_evidence",
+    }
+    scroll_by_step = {
+        1: "mulai-di-sini",
+        5: "pnl-monitor",
+    }
+    if step.number in action_by_step:
+        action = action_by_step[step.number]
+        return (
+            f'<button type="button" class="btn" data-action="{escape(action)}" '
+            f'title="{escape(step.help_text)}">{_action_icon(action)}{escape(step.action_label.replace("Klik ", ""))}</button>'
+        )
+    if step.number in scroll_by_step:
+        target = scroll_by_step[step.number]
+        return (
+            f'<button type="button" class="btn" data-scroll="{escape(target)}" '
+            f'title="{escape(step.help_text)}">{_svg_icon("play")}{escape(step.action_label.replace("Lihat ", "").replace("Buka ", ""))}</button>'
+        )
+    return f'<span class="small">{escape(step.action_label)}</span>'
 
 
 def _local_demo_html(panel: LocalDemoPanel) -> str:
