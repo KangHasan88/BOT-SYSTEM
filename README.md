@@ -4,6 +4,35 @@ Bot ini dibangun sebagai research system terlebih dahulu, bukan live trading bot
 Fokus awalnya adalah BTC/USDT dan ETH/USDT spot, dengan data capture, backtest,
 paper trading, risk manager, dan review harian sebelum live kecil dipertimbangkan.
 
+## Demo Ready Quick Start
+
+Status saat ini: ready to use untuk demo/paper account. Real live money tetap
+terkunci sampai evidence paper cukup dan owner approval dilakukan manual.
+
+Cara paling gampang di laptop:
+
+1. Double-click `start-bot-web.cmd`.
+2. Buka `http://127.0.0.1:8000/`.
+3. Ikuti panel `Demo Walkthrough`.
+4. Pantau naik-turun profit/loss di panel `P/L Visual Monitor`.
+5. Jika halaman mati atau `refused to connect`, double-click `start-bot-watchdog.cmd`.
+
+Panel penting untuk user awam:
+
+- `Control Room Awam`: ringkasan status aman/tidak aman.
+- `P/L Visual Monitor`: equity curve, win rate, trade count, dan net P/L demo.
+- `Fundamental/Event Lane`: warna risiko news/macro/exchange.
+- `Experiment Scoreboard`: daftar eksperimen strategi yang boleh lanjut paper review.
+- `Human Feedback`: label manual dari review chart/trade untuk melatih lesson bot.
+- `Live Evidence Gate`: bukti sebelum live; status live real tetap no-go sampai lengkap.
+
+Release check terakhir:
+
+- UAT: `UAT_READY_FOR_DEMO`, completion `100%`, bugs `0`.
+- Local demo: `READY_FOR_LOCAL_DEMO`.
+- Test suite: `244 unittest OK`.
+- Safety: `live_enabled=false`, `approved_live=false`.
+
 ## Operating Principle
 
 - Default mode: `research`.
