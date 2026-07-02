@@ -27,6 +27,7 @@ ACTIONS: dict[str, tuple[str, ...]] = {
     "skill_loop": ("skill-loop-report", "--config", "{config}"),
     "pattern_memory": ("pattern-memory-report", "--config", "{config}", "--limit", "{limit}"),
     "learning_dashboard": ("learning-dashboard-report", "--config", "{config}"),
+    "human_feedback": ("human-feedback-report", "--config", "{config}"),
     "build_dashboard": ("build-dashboard", "--config", "{config}"),
     "security_qa": ("security-qa-report", "--config", "{config}", "--env-file", ".env.example", "--scan-root", "."),
     "production_smoke": ("production-smoke-report", "--config", "{config}"),
@@ -246,6 +247,24 @@ class LearningDashboardPanel:
     summary: str
     guardrail: str
     trends: list[dict]
+
+
+@dataclass(frozen=True)
+class HumanFeedbackPanel:
+    report_path: str
+    exists: bool
+    status: str
+    generated_at_utc: str
+    label_path: str
+    total_labels: int
+    pairs_labeled: int
+    top_label: str
+    summary: str
+    guardrail: str
+    allowed_labels: list[str]
+    label_counts: dict[str, int]
+    recent_labels: list[dict]
+    lessons: list[dict]
 
 
 @dataclass(frozen=True)
@@ -593,6 +612,28 @@ def load_learning_dashboard_panel(config_path: str | Path = "config/bot.sample.t
     )
 
 
+def load_human_feedback_panel(config_path: str | Path = "config/bot.sample.toml") -> HumanFeedbackPanel:
+    config = load_config(Path(config_path))
+    path = Path(config.data_root) / "reports" / "learning" / "human_feedback.json"
+    payload = _read_json(path) or {}
+    return HumanFeedbackPanel(
+        report_path=str(path),
+        exists=path.exists(),
+        status=str(payload.get("status", "MISSING")),
+        generated_at_utc=str(payload.get("generated_at_utc", "")),
+        label_path=str(payload.get("label_path", Path(config.data_root) / "reports" / "learning" / "manual_labels.json")),
+        total_labels=int(payload.get("total_labels", 0) or 0),
+        pairs_labeled=int(payload.get("pairs_labeled", 0) or 0),
+        top_label=str(payload.get("top_label", "-")),
+        summary=str(payload.get("summary", "Klik Human Feedback setelah menambah label manual.")),
+        guardrail=str(payload.get("guardrail", "Feedback is review-only. No live orders.")),
+        allowed_labels=list(payload.get("allowed_labels", [])) if isinstance(payload.get("allowed_labels", []), list) else [],
+        label_counts=dict(payload.get("label_counts", {})) if isinstance(payload.get("label_counts", {}), dict) else {},
+        recent_labels=list(payload.get("recent_labels", [])) if isinstance(payload.get("recent_labels", []), list) else [],
+        lessons=list(payload.get("lessons", [])) if isinstance(payload.get("lessons", []), list) else [],
+    )
+
+
 def load_pnl_panel(config_path: str | Path = "config/bot.sample.toml") -> PnlPanel:
     config = load_config(Path(config_path))
     root = Path(config.data_root) / "paper"
@@ -816,6 +857,7 @@ def build_orchestrator_page(
     skill_loop: SkillLoopPanel | None = None,
     pattern_memory: PatternMemoryPanel | None = None,
     learning_dashboard: LearningDashboardPanel | None = None,
+    human_feedback: HumanFeedbackPanel | None = None,
     pnl: PnlPanel | None = None,
     walkthrough: list[DemoWalkthroughStep] | None = None,
 ) -> str:
@@ -835,6 +877,7 @@ def build_orchestrator_page(
     skill_loop = skill_loop or SkillLoopPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, "MISSING", "", "Research only. No live orders.", [], [])
     pattern_memory = pattern_memory or PatternMemoryPanel("", False, "MISSING", "", 0, 0, 0, "", "Review only. No live orders.", [])
     learning_dashboard = learning_dashboard or LearningDashboardPanel("", False, "MISSING", "", 0, 0, 0, 0, 0, 0, 0, "", "Read-only research. No live execution.", [])
+    human_feedback = human_feedback or HumanFeedbackPanel("", False, "MISSING", "", "", 0, 0, "-", "", "Feedback is review-only. No live orders.", [], {}, [], [])
     pnl = pnl or PnlPanel(0, 0, 0, 0, 0, 0, 0, 0, None, [])
     walkthrough = walkthrough or []
     action_buttons = "".join(_action_button(action, status.action_running) for action in ACTIONS)
@@ -854,6 +897,7 @@ def build_orchestrator_page(
     skill_loop_html = _skill_loop_html(skill_loop)
     pattern_memory_html = _pattern_memory_html(pattern_memory)
     learning_dashboard_html = _learning_dashboard_html(learning_dashboard)
+    human_feedback_html = _human_feedback_html(human_feedback)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
@@ -1023,6 +1067,11 @@ def build_orchestrator_page(
       <h2>Learning Dashboard</h2>
       <div>{learning_dashboard_html}</div>
       <p class="small">Dashboard ini merangkum trend pola, volume spike, dan evidence score untuk review awam.</p>
+    </section>
+    <section class="panel">
+      <h2>Human Feedback</h2>
+      <div>{human_feedback_html}</div>
+      <p class="small">Label manusia menjadi bahan lesson dan eksperimen. Tidak ada auto-live dari feedback.</p>
     </section>
     <section class="panel">
       <h2>P/L Visual Monitor</h2>
@@ -1221,6 +1270,9 @@ def _handler_factory(config_path: Path):
                 if parsed.path == "/api/learning-dashboard":
                     self._json_response(asdict(load_learning_dashboard_panel(config_path)))
                     return
+                if parsed.path == "/api/human-feedback":
+                    self._json_response(asdict(load_human_feedback_panel(config_path)))
+                    return
                 if parsed.path == "/api/pnl":
                     self._json_response(asdict(load_pnl_panel(config_path)))
                     return
@@ -1263,6 +1315,7 @@ def _handler_factory(config_path: Path):
                 skill_loop = load_skill_loop_panel(config_path)
                 pattern_memory = load_pattern_memory_panel(config_path)
                 learning_dashboard = load_learning_dashboard_panel(config_path)
+                human_feedback = load_human_feedback_panel(config_path)
                 pnl = load_pnl_panel(config_path)
                 walkthrough = load_demo_walkthrough(config_path)
                 self._html_response(
@@ -1284,6 +1337,7 @@ def _handler_factory(config_path: Path):
                         skill_loop,
                         pattern_memory,
                         learning_dashboard,
+                        human_feedback,
                         pnl,
                         walkthrough,
                     )
@@ -1912,6 +1966,53 @@ def _learning_dashboard_html(panel: LearningDashboardPanel) -> str:
     )
 
 
+def _human_feedback_html(panel: HumanFeedbackPanel) -> str:
+    status_css = _report_status_class(panel.status)
+    label_rows = []
+    for label in panel.recent_labels:
+        label_rows.append(
+            "<tr>"
+            f"<td>{escape(str(label.get('created_at_utc', '')))}</td>"
+            f"<td>{escape(str(label.get('symbol', '')))}</td>"
+            f"<td>{escape(str(label.get('timeframe', '')))}</td>"
+            f"<td>{escape(str(label.get('label', '')))}</td>"
+            f"<td>{escape(str(label.get('note', '')))}</td>"
+            f"<td>{escape(str(label.get('reviewer', '')))}</td>"
+            "</tr>"
+        )
+    recent_rows = "".join(label_rows) if label_rows else '<tr><td colspan="6">Belum ada label. Tambahkan via command add-feedback-label.</td></tr>'
+    lesson_rows = []
+    for lesson in panel.lessons:
+        lesson_rows.append(
+            "<tr>"
+            f"<td>{escape(str(lesson.get('label', '')))}</td>"
+            f"<td>{int(lesson.get('count', 0) or 0)}</td>"
+            f"<td>{escape(str(lesson.get('lesson', '')))}</td>"
+            f"<td>{escape(str(lesson.get('next_action', '')))}</td>"
+            "</tr>"
+        )
+    lessons = "".join(lesson_rows) if lesson_rows else '<tr><td colspan="4">Belum ada lesson dari feedback.</td></tr>'
+    allowed = ", ".join(panel.allowed_labels) if panel.allowed_labels else "-"
+    return (
+        '<div class="grid">'
+        + _metric("Status Feedback", f'<span class="badge {status_css}">{escape(panel.status)}</span>')
+        + _metric("Total Labels", panel.total_labels)
+        + _metric("Pairs Labeled", panel.pairs_labeled)
+        + _metric("Top Label", escape(panel.top_label))
+        + _metric("Summary", escape(panel.summary))
+        + "</div>"
+        + f'<p class="small">{escape(panel.guardrail)}</p>'
+        + f'<p class="small">Allowed labels: <code>{escape(allowed)}</code></p>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Label</th><th>Count</th><th>Lesson</th><th>Aksi Berikut</th></tr></thead>"
+        + f"<tbody>{lessons}</tbody></table>"
+        + '<div style="height:10px"></div>'
+        + '<table class="data-table">'
+        + "<thead><tr><th>Waktu</th><th>Symbol</th><th>TF</th><th>Label</th><th>Note</th><th>Reviewer</th></tr></thead>"
+        + f"<tbody>{recent_rows}</tbody></table>"
+    )
+
+
 def _walkthrough_status(check: SetupCheck | None) -> str:
     if check is None:
         return "TODO"
@@ -2295,6 +2396,7 @@ def _help_text_for(label: str) -> str:
         "avg evidence score": direct["evidence score"],
         "status dashboard": "Ringkasan apakah dashboard belajar sudah punya data yang bisa dibaca.",
         "learning dashboard": "Ringkasan pola, volume, outcome paper, dan evidence score.",
+        "human feedback": "Ringkasan label manual dari review chart/trade untuk lesson bot.",
         "validasi config": "Cek mode bot, live lock, dan simbol tanpa melakukan order.",
         "import db": "Masukkan data CSV/JSON lokal ke SQLite agar bisa dipelajari.",
         "learning db": "Buat snapshot pola dari database lokal.",
@@ -2318,6 +2420,7 @@ def _action_label(action: str) -> str:
         "skill_loop": "Skill Loop",
         "pattern_memory": "Pattern Memory",
         "learning_dashboard": "Learning Dashboard",
+        "human_feedback": "Human Feedback",
         "build_dashboard": "Buat Dashboard",
         "security_qa": "Security QA",
         "production_smoke": "Production Smoke",

@@ -55,12 +55,15 @@ from trading_bot.reports.quality import save_quality_report
 from trading_bot.reports.walk_forward import save_walk_forward_report
 from trading_bot.research import (
     ResearchDatasetCsvStore,
+    add_human_feedback_label,
+    build_human_feedback_report,
     build_learning_dashboard_report,
     build_pattern_outcome_dataset,
     build_pattern_memory_report,
     build_skill_loop_report,
     generate_database_learning_snapshot,
     save_database_learning_snapshot,
+    save_human_feedback_report,
     save_learning_dashboard_report,
     save_pattern_memory_report,
     save_skill_loop_report,
@@ -122,6 +125,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     learning_dashboard = subparsers.add_parser("learning-dashboard-report")
     learning_dashboard.add_argument("--config", default="config/bot.sample.toml")
+
+    add_feedback = subparsers.add_parser("add-feedback-label")
+    add_feedback.add_argument("--config", default="config/bot.sample.toml")
+    add_feedback.add_argument("--symbol", required=True)
+    add_feedback.add_argument("--timeframe", required=True)
+    add_feedback.add_argument("--label", required=True)
+    add_feedback.add_argument("--note", default="")
+    add_feedback.add_argument("--reviewer", default="owner")
+    add_feedback.add_argument("--confidence", default="manual")
+    add_feedback.add_argument("--label-path")
+
+    human_feedback = subparsers.add_parser("human-feedback-report")
+    human_feedback.add_argument("--config", default="config/bot.sample.toml")
+    human_feedback.add_argument("--label-path")
+    human_feedback.add_argument("--limit", type=int, default=10)
 
     demo_data = subparsers.add_parser("seed-demo-data")
     demo_data.add_argument("--config", default="config/bot.sample.toml")
@@ -573,6 +591,48 @@ def main(argv: list[str] | None = None) -> int:
                 f"grade={trend.outcome_grade}, evidence_score={trend.evidence_score:.2f}, "
                 f"status={trend.status}"
             )
+        return 0
+
+    if args.command == "add-feedback-label":
+        try:
+            config = load_config(Path(args.config))
+            feedback = add_human_feedback_label(
+                config,
+                symbol=args.symbol,
+                timeframe=args.timeframe,
+                label=args.label,
+                note=args.note,
+                reviewer=args.reviewer,
+                confidence=args.confidence,
+                label_path=args.label_path,
+            )
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"add feedback label failed: {exc}")
+            return 2
+
+        print(
+            "feedback label added: "
+            f"{feedback.symbol} {feedback.timeframe} label={feedback.label}, "
+            f"reviewer={feedback.reviewer}, created_at={feedback.created_at_utc}"
+        )
+        return 0
+
+    if args.command == "human-feedback-report":
+        try:
+            config = load_config(Path(args.config))
+            report = build_human_feedback_report(config, label_path=args.label_path, limit=args.limit)
+            path = save_human_feedback_report(report, config.data_root)
+        except (ConfigError, OSError, ValueError) as exc:
+            print(f"human feedback failed: {exc}")
+            return 2
+
+        print(
+            "human feedback: "
+            f"status={report.status}, labels={report.total_labels}, pairs={report.pairs_labeled}, "
+            f"top_label={report.top_label}, path={path}"
+        )
+        for lesson in report.lessons[:8]:
+            print(f"lesson: {lesson.label} count={lesson.count}, next={lesson.next_action}")
         return 0
 
     if args.command == "seed-demo-data":

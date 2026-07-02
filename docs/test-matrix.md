@@ -80,6 +80,7 @@ python -m trading_bot.cli live-go-no-go-report --config config/bot.sample.toml
 | Pattern memory | `tests/test_pattern_memory_unittest.py` | unit | Combine paper outcomes and manual labels without live execution |
 | Learning dashboard | `tests/test_learning_dashboard_unittest.py` | unit | Summarize pattern trend, volume spike, and evidence score |
 | Hover help glossary | `tests/test_orchestrator_unittest.py` | unit | Render beginner glossary and hover text in local web UI |
+| Human feedback labels | `tests/test_human_feedback_unittest.py` | unit | Append manual labels and summarize bot lessons without live execution |
 | Kill switch | `tests/test_kill_switch_unittest.py` | integration | Block cycle while kill switch is active |
 | Incident drill | `tests/test_incident_drill_unittest.py` | integration | Verify exchange API down, network down, bot crash safe response |
 | Post-trade analysis | `tests/test_post_trade_unittest.py` | unit | Summarize PnL, exit reason, best/worst hour |

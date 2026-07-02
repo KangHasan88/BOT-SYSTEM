@@ -9,6 +9,7 @@ from trading_bot.orchestrator import (
     ACTIONS,
     DatabasePanel,
     DemoWalkthroughStep,
+    HumanFeedbackPanel,
     LearningDashboardPanel,
     LiveEvidencePanel,
     LocalDemoPanel,
@@ -24,6 +25,7 @@ from trading_bot.orchestrator import (
     load_demo_walkthrough,
     load_glossary_entries,
     load_health_summary,
+    load_human_feedback_panel,
     load_incident_panel,
     load_learning_dashboard_panel,
     load_live_evidence_panel,
@@ -72,6 +74,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Skill Loop", html)
         self.assertIn("Pattern Memory", html)
         self.assertIn("Learning Dashboard", html)
+        self.assertIn("Human Feedback", html)
         self.assertIn("Kamus Awam", html)
         self.assertIn("Evidence Score", html)
         self.assertIn("Arti Awam", html)
@@ -627,6 +630,78 @@ class OrchestratorTest(unittest.TestCase):
         self.assertTrue(panel.exists)
         self.assertEqual("LEARNING_DASHBOARD_ACTIVE", panel.status)
         self.assertEqual(1, panel.volume_spike_count)
+
+    def test_human_feedback_panel_renders_lessons(self) -> None:
+        panel = HumanFeedbackPanel(
+            report_path="work/market_data/reports/learning/human_feedback.json",
+            exists=True,
+            status="HUMAN_FEEDBACK_ACTIVE",
+            generated_at_utc="2026-07-01T00:00:00+00:00",
+            label_path="work/market_data/reports/learning/manual_labels.json",
+            total_labels=1,
+            pairs_labeled=1,
+            top_label="entry_telat",
+            summary="1 feedback label terbaca",
+            guardrail="Human feedback can update lessons, but must never place live orders.",
+            allowed_labels=["entry_telat", "false_signal"],
+            label_counts={"entry_telat": 1},
+            recent_labels=[
+                {
+                    "symbol": "BTC/USDT",
+                    "timeframe": "15m",
+                    "label": "entry_telat",
+                    "note": "entry terlalu jauh dari trigger",
+                    "reviewer": "hasan",
+                    "created_at_utc": "2026-07-01T00:00:00+00:00",
+                }
+            ],
+            lessons=[
+                {
+                    "label": "entry_telat",
+                    "count": 1,
+                    "lesson": "entry sering terlambat",
+                    "next_action": "Review candle sebelum entry",
+                }
+            ],
+        )
+        status = load_orchestrator_status("config/bot.sample.toml")
+
+        html = build_orchestrator_page(status, human_feedback=panel)
+
+        self.assertIn("Human Feedback", html)
+        self.assertIn("HUMAN_FEEDBACK_ACTIVE", html)
+        self.assertIn("entry_telat", html)
+        self.assertIn("Review candle sebelum entry", html)
+
+    def test_human_feedback_panel_loader_reads_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            data_root = root / "data"
+            config_path = root / "bot.toml"
+            _write_config(config_path, data_root)
+            _write_json(
+                data_root / "reports" / "learning" / "human_feedback.json",
+                {
+                    "status": "HUMAN_FEEDBACK_ACTIVE",
+                    "generated_at_utc": "2026-07-01T00:00:00+00:00",
+                    "label_path": "manual_labels.json",
+                    "total_labels": 1,
+                    "pairs_labeled": 1,
+                    "top_label": "entry_telat",
+                    "summary": "active",
+                    "guardrail": "No live orders.",
+                    "allowed_labels": ["entry_telat"],
+                    "label_counts": {"entry_telat": 1},
+                    "recent_labels": [{"symbol": "BTC/USDT", "label": "entry_telat"}],
+                    "lessons": [{"label": "entry_telat", "count": 1}],
+                },
+            )
+
+            panel = load_human_feedback_panel(config_path)
+
+        self.assertTrue(panel.exists)
+        self.assertEqual("HUMAN_FEEDBACK_ACTIVE", panel.status)
+        self.assertEqual(1, panel.total_labels)
 
     def test_vps_demo_panel_renders_private_access_summary(self) -> None:
         panel = VpsDemoPanel(

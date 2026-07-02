@@ -280,6 +280,31 @@ Status yang sama tersedia sebagai JSON di:
 http://127.0.0.1:8000/api/learning-dashboard
 ```
 
+## Human Feedback
+
+Panel `Human Feedback` membaca:
+
+```text
+work/market_data/reports/learning/human_feedback.json
+```
+
+Label manual ditulis ke:
+
+```text
+work/market_data/reports/learning/manual_labels.json
+```
+
+Gunakan command `add-feedback-label` untuk memberi label seperti
+`entry_telat`, `false_signal`, `profit_lock_bagus`, atau `skip_benar`, lalu
+klik tombol `Human Feedback` untuk refresh lesson di web. Feedback ini hanya
+bahan review dan eksperimen, bukan perintah live.
+
+Status yang sama tersedia sebagai JSON di:
+
+```text
+http://127.0.0.1:8000/api/human-feedback
+```
+
 ## Setup Cepat
 
 Halaman utama punya checklist first-run untuk:

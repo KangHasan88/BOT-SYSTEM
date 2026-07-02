@@ -164,6 +164,20 @@ Label sederhana untuk review manual:
 
 Label ini menjadi bahan riset, bukan perintah live.
 
+Command:
+
+```bash
+python -m trading_bot.cli add-feedback-label --config config/bot.sample.toml --symbol BTC/USDT --timeframe 15m --label entry_telat --note "entry terlalu jauh dari trigger"
+python -m trading_bot.cli human-feedback-report --config config/bot.sample.toml
+```
+
+Report:
+
+```text
+work/market_data/reports/learning/manual_labels.json
+work/market_data/reports/learning/human_feedback.json
+```
+
 ## Weekly Review Output
 
 Setiap minggu, bot harus bisa menghasilkan ringkasan:

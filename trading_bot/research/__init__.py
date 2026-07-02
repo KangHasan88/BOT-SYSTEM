@@ -20,11 +20,24 @@ from trading_bot.research.learning_dashboard import (
     build_learning_dashboard_report,
     save_learning_dashboard_report,
 )
+from trading_bot.research.human_feedback import (
+    ALLOWED_FEEDBACK_LABELS,
+    HumanFeedbackLabel,
+    HumanFeedbackLesson,
+    HumanFeedbackReport,
+    add_human_feedback_label,
+    build_human_feedback_report,
+    save_human_feedback_report,
+)
 from trading_bot.research.skill_loop import SkillLoopReport, SkillLoopStep, build_skill_loop_report, save_skill_loop_report
 from trading_bot.research.csv_store import ResearchDatasetCsvStore
 
 __all__ = [
     "DatabaseLearningSnapshot",
+    "ALLOWED_FEEDBACK_LABELS",
+    "HumanFeedbackLabel",
+    "HumanFeedbackLesson",
+    "HumanFeedbackReport",
     "ManualPatternLabel",
     "MarketLearningRow",
     "PatternOutcomeRow",
@@ -35,12 +48,15 @@ __all__ = [
     "LearningDashboardTrend",
     "SkillLoopReport",
     "SkillLoopStep",
+    "add_human_feedback_label",
+    "build_human_feedback_report",
     "build_pattern_outcome_dataset",
     "build_pattern_memory_report",
     "build_learning_dashboard_report",
     "build_skill_loop_report",
     "generate_database_learning_snapshot",
     "save_database_learning_snapshot",
+    "save_human_feedback_report",
     "save_pattern_memory_report",
     "save_learning_dashboard_report",
     "save_skill_loop_report",

@@ -49,6 +49,8 @@ python -m trading_bot.cli db-learning-report --config config/bot.sample.toml
 python -m trading_bot.cli skill-loop-report --config config/bot.sample.toml
 python -m trading_bot.cli pattern-memory-report --config config/bot.sample.toml
 python -m trading_bot.cli learning-dashboard-report --config config/bot.sample.toml
+python -m trading_bot.cli add-feedback-label --config config/bot.sample.toml --symbol BTC/USDT --timeframe 15m --label entry_telat --note "entry terlalu jauh dari trigger"
+python -m trading_bot.cli human-feedback-report --config config/bot.sample.toml
 ```
 
 ## Data Collection
