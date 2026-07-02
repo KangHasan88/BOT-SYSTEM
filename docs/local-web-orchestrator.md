@@ -41,6 +41,43 @@ Launcher akan menjalankan orchestrator di background, menyimpan process id ke
 `work/orchestrator/local-web.pid`, menunggu `/api/setup`, lalu membuka browser
 ketika sudah siap.
 
+## Mulai di Sini
+
+Panel `Mulai di Sini` adalah menu instalasi dan langkah awal di web. Panel ini
+muncul di bagian atas dashboard agar user tidak perlu membuka file satu per
+satu.
+
+Urutannya:
+
+1. Buka folder project:
+
+```text
+C:\Users\IT-MGR\Documents\Codex\2026-06-28\bro-2
+```
+
+2. Double-click launcher:
+
+```text
+start-bot-web.cmd
+```
+
+3. Buka web lokal:
+
+```text
+http://127.0.0.1:8000/
+```
+
+4. Ikuti `Demo Walkthrough`.
+5. Pantau naik-turun profit/loss di `P/L Visual Monitor`.
+6. Jika browser refused, double-click:
+
+```text
+start-bot-watchdog.cmd
+```
+
+Menu ini tetap demo/paper only. Real live tetap dikunci sampai evidence dan
+owner approval lengkap.
+
 Jika halaman `127.0.0.1:8000` mati atau muncul `refused to connect`, jalankan
 watchdog lokal:
 

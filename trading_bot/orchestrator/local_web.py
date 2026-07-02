@@ -979,6 +979,7 @@ def build_orchestrator_page(
     fundamental_html = _fundamental_html(fundamental)
     experiment_scoreboard_html = _experiment_scoreboard_html(experiment_scoreboard)
     beginner_html = _beginner_control_room_html(status, health, live_evidence)
+    getting_started_html = _getting_started_html(status)
     pnl_html = _pnl_panel_html(pnl)
     walkthrough_html = _demo_walkthrough_html(walkthrough)
     safety_class = "danger" if status.live_enabled or status.kill_switch_active else "ok"
@@ -1053,6 +1054,12 @@ def build_orchestrator_page(
     .walk-number {{ width: 28px; height: 28px; border-radius: 999px; background: var(--focus); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none; }}
     .walk-goal {{ color: #475569; font-size: 13px; line-height: 1.45; flex: 1; }}
     .walk-action {{ color: var(--muted); font-size: 12px; font-weight: 800; }}
+    .start-guide {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }}
+    .start-card {{ border: 1px solid var(--soft-line); border-radius: 8px; background: #fff; padding: 12px; min-height: 158px; display: flex; flex-direction: column; gap: 8px; }}
+    .start-card-head {{ display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: #334155; }}
+    .start-index {{ width: 26px; height: 26px; border-radius: 999px; background: var(--focus); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex: none; }}
+    .start-copy {{ color: #475569; font-size: 13px; line-height: 1.45; flex: 1; }}
+    .start-command {{ display: inline-block; width: fit-content; max-width: 100%; overflow-wrap: anywhere; color: #334155; background: #f1f5f9; border: 1px solid var(--soft-line); border-radius: 7px; padding: 5px 7px; font-size: 12px; font-weight: 800; }}
     .badge {{ display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.35; }}
     .ok {{ background: #dcfce7; color: var(--good); }}
     .danger {{ background: #fee2e2; color: var(--bad); }}
@@ -1104,6 +1111,11 @@ def build_orchestrator_page(
       <div class="board-toolbar">
         <div class="toolbar-group">{action_buttons}</div>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Mulai di Sini</h2>
+      <div>{getting_started_html}</div>
+      <p class="small">Menu ini adalah urutan instalasi dan langkah awal untuk menjalankan bot demo/paper di laptop.</p>
     </section>
     <section class="panel">
       <h2>Control Room Awam</h2>
@@ -1757,6 +1769,60 @@ def _beginner_step_html(step: BeginnerStep) -> str:
         "</div>"
         "</div>"
     )
+
+
+def _getting_started_html(status: OrchestratorStatus) -> str:
+    live_label = "Live terkunci" if not status.live_enabled and not status.approved_live else "Perlu cek live"
+    steps = [
+        (
+            "Buka Folder Project",
+            "Masuk ke folder bot di laptop. Ini lokasi file launcher dan config demo.",
+            r"C:\Users\IT-MGR\Documents\Codex\2026-06-28\bro-2",
+        ),
+        (
+            "Start Web Demo",
+            "Double-click file ini untuk menyalakan dashboard lokal. Jika sudah hidup, langkah ini tidak perlu diulang.",
+            "start-bot-web.cmd",
+        ),
+        (
+            "Buka Browser Lokal",
+            "Buka alamat dashboard. Semua tombol di sini aman untuk demo/paper dan tidak membuat order live.",
+            "http://127.0.0.1:8000/",
+        ),
+        (
+            "Ikuti Demo Walkthrough",
+            "Lanjutkan urutan di panel Demo Walkthrough untuk validasi config, data demo, evidence, dan P/L.",
+            "Demo Walkthrough",
+        ),
+        (
+            "Pantau Profit/Loss",
+            "Naik-turun saldo simulasi ada di panel P/L Visual Monitor: equity curve, net P/L, win rate, dan trade terakhir.",
+            "P/L Visual Monitor",
+        ),
+        (
+            "Auto-Repair Jika Mati",
+            "Jika browser refused atau web mati, jalankan watchdog. Helper ini hanya menyalakan web demo, bukan order live.",
+            "start-bot-watchdog.cmd",
+        ),
+        (
+            "Pastikan Safety",
+            f"Status saat ini: {live_label}. Real live tetap no-go sampai evidence dan approval manual lengkap.",
+            "Live Evidence Gate",
+        ),
+    ]
+    cards = []
+    for index, (title, copy, command) in enumerate(steps, start=1):
+        cards.append(
+            '<div class="start-card" title="Langkah awal demo/paper">'
+            + '<div class="start-card-head">'
+            + f'<span class="start-index">{index}</span>'
+            + f"<strong>{escape(title)}</strong>"
+            + "</div>"
+            + f'<div class="start-copy">{escape(copy)}</div>'
+            + f'<code class="start-command">{escape(command)}</code>'
+            + "</div>"
+        )
+    return '<div class="start-guide">' + "".join(cards) + "</div>"
 
 
 def _beginner_overall_status(
