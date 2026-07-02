@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS paper_account_snapshots (
     consecutive_losses_today INTEGER NOT NULL,
     trading_status TEXT NOT NULL,
     status_reason TEXT NOT NULL,
+    unrealized_pnl REAL NOT NULL DEFAULT 0,
+    marked_equity REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

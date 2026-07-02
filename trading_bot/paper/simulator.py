@@ -151,15 +151,17 @@ def run_paper_session(
                     )
                 )
                 snapshots.append(
-                    PaperAccountSnapshot(
-                        open_time_ms=candle.open_time_ms,
+                    _account_snapshot(
+                        candle_open_time_ms=candle.open_time_ms,
                         equity=equity,
                         day_start_equity=day_start_equity,
                         month_start_equity=month_start_equity,
-                        open_positions=0,
+                        open_position=None,
+                        current_close=candle.close,
                         consecutive_losses_today=consecutive_losses_today,
                         trading_status=trading_status,
                         status_reason=status_reason,
+                        config=config,
                     )
                 )
                 continue
@@ -227,15 +229,17 @@ def run_paper_session(
                 )
 
         snapshots.append(
-            PaperAccountSnapshot(
-                open_time_ms=candle.open_time_ms,
+            _account_snapshot(
+                candle_open_time_ms=candle.open_time_ms,
                 equity=equity,
                 day_start_equity=day_start_equity,
                 month_start_equity=month_start_equity,
-                open_positions=1 if open_position is not None else 0,
+                open_position=open_position,
+                current_close=candle.close,
                 consecutive_losses_today=consecutive_losses_today,
                 trading_status=trading_status,
                 status_reason=status_reason,
+                config=config,
             )
         )
 
@@ -281,6 +285,42 @@ def _apply_buy_slippage(price: float, config: PaperConfig) -> float:
 
 def _apply_sell_slippage(price: float, config: PaperConfig) -> float:
     return price * (1 - (config.slippage_pct / 100))
+
+
+def _account_snapshot(
+    candle_open_time_ms: int,
+    equity: float,
+    day_start_equity: float,
+    month_start_equity: float,
+    open_position: dict[str, float | int] | None,
+    current_close: float,
+    consecutive_losses_today: int,
+    trading_status: str,
+    status_reason: str,
+    config: PaperConfig,
+) -> PaperAccountSnapshot:
+    unrealized_pnl = _unrealized_pnl(open_position, current_close, config) if open_position is not None else 0.0
+    return PaperAccountSnapshot(
+        open_time_ms=candle_open_time_ms,
+        equity=equity,
+        day_start_equity=day_start_equity,
+        month_start_equity=month_start_equity,
+        open_positions=1 if open_position is not None else 0,
+        consecutive_losses_today=consecutive_losses_today,
+        trading_status=trading_status,
+        status_reason=status_reason,
+        unrealized_pnl=unrealized_pnl,
+        marked_equity=equity + unrealized_pnl,
+    )
+
+
+def _unrealized_pnl(position: dict[str, float | int], current_close: float, config: PaperConfig) -> float:
+    quantity = float(position["quantity"])
+    entry_price = float(position["entry_price"])
+    marked_exit_price = _apply_sell_slippage(current_close, config)
+    gross_pnl = (marked_exit_price - entry_price) * quantity
+    exit_fee = (marked_exit_price * quantity) * (config.fee_pct / 100)
+    return gross_pnl - exit_fee
 
 
 def _close_position(

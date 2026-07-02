@@ -60,6 +60,8 @@ def init_database(db_path: str | Path, schema_path: str | Path = "database/schem
     schema = Path(schema_path).read_text(encoding="utf-8")
     with sqlite3.connect(path) as connection:
         connection.executescript(schema)
+        _ensure_column(connection, "paper_account_snapshots", "unrealized_pnl", "REAL NOT NULL DEFAULT 0")
+        _ensure_column(connection, "paper_account_snapshots", "marked_equity", "REAL NOT NULL DEFAULT 0")
         _create_idempotency_indexes(connection)
         connection.commit()
     return path
@@ -188,6 +190,12 @@ def _table_count(connection: sqlite3.Connection, table: str) -> int:
     return int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
 
 
+def _ensure_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def _utc_from_timestamp(timestamp: float) -> str:
     from datetime import datetime, timezone
 
@@ -287,8 +295,9 @@ def _import_paper_account(connection: sqlite3.Connection, root: Path) -> int:
         """
         INSERT OR IGNORE INTO paper_account_snapshots (
             open_time_ms, equity, day_start_equity, month_start_equity,
-            open_positions, consecutive_losses_today, trading_status, status_reason
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            open_positions, consecutive_losses_today, trading_status, status_reason,
+            unrealized_pnl, marked_equity
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         lambda row: (
             int(row["open_time_ms"]),
@@ -299,6 +308,8 @@ def _import_paper_account(connection: sqlite3.Connection, root: Path) -> int:
             int(row["consecutive_losses_today"]),
             row["trading_status"],
             row["status_reason"],
+            float(row.get("unrealized_pnl", 0) or 0),
+            float(row.get("marked_equity", row.get("equity", 0)) or 0),
         ),
     )
 

@@ -180,9 +180,9 @@ class OrchestratorTest(unittest.TestCase):
             )
             account_path = data_root / "paper" / "BTC_USDT" / "15m" / "account.csv"
             account_path.write_text(
-                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
+                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason,unrealized_pnl,marked_equity\n"
                 "1710000000000,1000,1000,1000,0,0,OPEN,paper session started\n"
-                "1710000900000,1002.5,1000,1000,1,0,OPEN,position still open\n",
+                "1710000900000,1002.5,1000,1000,1,0,OPEN,position still open,4.25,1006.75\n",
                 encoding="utf-8",
             )
 
@@ -198,6 +198,10 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("Posisi Paper", html)
         self.assertIn("1 terbuka", html)
         self.assertIn("1002.50000000", html)
+        self.assertIn("Unrealized P/L", html)
+        self.assertIn("4.25000000", html)
+        self.assertIn("Marked Equity", html)
+        self.assertIn("1006.75000000", html)
         self.assertIn("outside entry window", html)
         self.assertIn("risk approved", html)
 
@@ -1040,10 +1044,10 @@ class OrchestratorTest(unittest.TestCase):
             paper_root = data_root / "paper" / "BTC_USDT" / "15m"
             paper_root.mkdir(parents=True)
             (paper_root / "account.csv").write_text(
-                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
-                "1717200000000,1000,1000,1000,0,0,OPEN,\n"
-                "1717200900000,1008,1000,1000,0,0,OPEN,\n"
-                "1717287300000,1003,1008,1000,0,1,OPEN,\n",
+                "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason,unrealized_pnl,marked_equity\n"
+                "1717200000000,1000,1000,1000,0,0,OPEN,,0,1000\n"
+                "1717200900000,1008,1000,1000,0,0,OPEN,,0,1008\n"
+                "1717287300000,1003,1008,1000,1,1,OPEN,,1.5,1004.5\n",
                 encoding="utf-8",
             )
             (paper_root / "trades.csv").write_text(
@@ -1058,7 +1062,7 @@ class OrchestratorTest(unittest.TestCase):
         self.assertEqual(2, panel.trade_count)
         self.assertEqual(50.0, panel.win_rate_pct)
         self.assertEqual(3.0, panel.net_pnl)
-        self.assertEqual(1003.0, panel.latest_equity)
+        self.assertEqual(1004.5, panel.latest_equity)
         self.assertEqual(2, len(panel.daily_rows))
         self.assertEqual("Loss", panel.daily_rows[0].result)
         self.assertEqual("Profit", panel.daily_rows[1].result)

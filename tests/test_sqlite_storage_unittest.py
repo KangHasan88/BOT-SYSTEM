@@ -22,6 +22,8 @@ class SqliteStorageTest(unittest.TestCase):
         self.assertIn("paper_trades", tables)
         self.assertIn("audit_events", tables)
         self.assertIn("orchestrator_activity", tables)
+        self.assertIn("unrealized_pnl", _table_columns(db_path, "paper_account_snapshots"))
+        self.assertIn("marked_equity", _table_columns(db_path, "paper_account_snapshots"))
 
     def test_import_runtime_data_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -52,6 +54,7 @@ class SqliteStorageTest(unittest.TestCase):
         self.assertEqual(1, counts["paper_account_snapshots"])
         self.assertEqual(1, counts["audit_events"])
         self.assertEqual(1, counts["orchestrator_activity"])
+        self.assertEqual((0.25, 1000.73), _paper_account_marked_values(db_path))
 
     def test_database_status_reports_counts(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -92,8 +95,8 @@ def _write_runtime_files(root: Path) -> None:
         encoding="utf-8",
     )
     (paper_path / "account.csv").write_text(
-        "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason\n"
-        "1710000000000,1000.48,1000,1000,0,0,ACTIVE,unit\n",
+        "open_time_ms,equity,day_start_equity,month_start_equity,open_positions,consecutive_losses_today,trading_status,status_reason,unrealized_pnl,marked_equity\n"
+        "1710000000000,1000.48,1000,1000,1,0,ACTIVE,unit,0.25,1000.73\n",
         encoding="utf-8",
     )
 
@@ -148,6 +151,24 @@ def _table_counts(db_path: Path, tables: list[str]) -> dict[str, int]:
         for table in tables:
             counts[table] = int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
         return counts
+    finally:
+        connection.close()
+
+
+def _table_columns(db_path: Path, table: str) -> set[str]:
+    connection = sqlite3.connect(db_path)
+    try:
+        rows = connection.execute(f"PRAGMA table_info({table})").fetchall()
+        return {str(row[1]) for row in rows}
+    finally:
+        connection.close()
+
+
+def _paper_account_marked_values(db_path: Path) -> tuple[float, float]:
+    connection = sqlite3.connect(db_path)
+    try:
+        row = connection.execute("SELECT unrealized_pnl, marked_equity FROM paper_account_snapshots").fetchone()
+        return (float(row[0]), float(row[1]))
     finally:
         connection.close()
 

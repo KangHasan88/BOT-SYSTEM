@@ -55,6 +55,8 @@ class PaperAccountSnapshot:
     consecutive_losses_today: int
     trading_status: str
     status_reason: str
+    unrealized_pnl: float = 0.0
+    marked_equity: float = 0.0
 
 
 @dataclass(frozen=True)

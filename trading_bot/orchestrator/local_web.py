@@ -394,6 +394,8 @@ class PaperPositionSnapshot:
     time_utc: str
     equity: float
     day_start_equity: float
+    unrealized_pnl: float
+    marked_equity: float
     open_positions: int
     trading_status: str
     status_reason: str
@@ -2156,6 +2158,9 @@ def _paper_execution_html(panel: PaperExecutionPanel) -> str:
     position_css = "warn" if snapshot and snapshot.open_positions else "ok"
     position_text = f"{snapshot.open_positions} terbuka" if snapshot else "belum ada"
     equity_text = f"{snapshot.equity:.8f}" if snapshot else "-"
+    marked_equity_text = f"{snapshot.marked_equity:.8f}" if snapshot else "-"
+    unrealized_css = "ok" if snapshot and snapshot.unrealized_pnl > 0 else "danger" if snapshot and snapshot.unrealized_pnl < 0 else "warn"
+    unrealized_text = f"{snapshot.unrealized_pnl:.8f}" if snapshot else "-"
     status_text = snapshot.trading_status if snapshot else "MISSING"
     status_reason = snapshot.status_reason if snapshot and snapshot.status_reason else "Belum ada snapshot akun paper."
     summary = (
@@ -2164,7 +2169,9 @@ def _paper_execution_html(panel: PaperExecutionPanel) -> str:
         + _metric("Filled", f'<span class="badge ok">{panel.filled_count}</span>', "Order simulasi yang berhasil dieksekusi.")
         + _metric("Rejected", f'<span class="badge warn">{panel.rejected_count}</span>', "Order simulasi yang ditolak risk/session guard.")
         + _metric("Posisi Paper", f'<span class="badge {position_css}">{escape(position_text)}</span>', "Jumlah posisi simulasi yang masih terbuka.")
-        + _metric("Equity Paper", equity_text, "Saldo simulasi terakhir dari account snapshot.")
+        + _metric("Equity Paper", equity_text, "Saldo realized simulasi. Posisi open belum dihitung penuh di angka ini.")
+        + _metric("Unrealized P/L", f'<span class="badge {unrealized_css}">{unrealized_text}</span>', "Profit/rugi sementara dari posisi paper yang masih terbuka.")
+        + _metric("Marked Equity", marked_equity_text, "Equity paper jika posisi open dinilai memakai harga candle terakhir.")
         + _metric("Status Trading", escape(status_text), status_reason)
         + "</div>"
     )
@@ -3239,6 +3246,8 @@ def _load_latest_position_snapshot(root: Path) -> PaperPositionSnapshot | None:
                                 time_utc=_format_ms(open_time_ms),
                                 equity=float(row.get("equity", 0) or 0),
                                 day_start_equity=float(row.get("day_start_equity", 0) or 0),
+                                unrealized_pnl=float(row.get("unrealized_pnl", 0) or 0),
+                                marked_equity=float(row.get("marked_equity", row.get("equity", 0)) or 0),
                                 open_positions=int(row.get("open_positions", 0) or 0),
                                 trading_status=str(row.get("trading_status", "") or "UNKNOWN"),
                                 status_reason=str(row.get("status_reason", "") or ""),
@@ -3263,7 +3272,8 @@ def _load_equity_series(root: Path) -> list[list[float]]:
         with path.open("r", newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
                 try:
-                    points.append((int(row.get("open_time_ms", 0) or 0), float(row.get("equity", 0) or 0)))
+                    equity_value = row.get("marked_equity", row.get("equity", 0))
+                    points.append((int(row.get("open_time_ms", 0) or 0), float(equity_value or 0)))
                 except ValueError:
                     continue
         if points:

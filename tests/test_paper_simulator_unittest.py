@@ -82,6 +82,15 @@ class PaperSimulatorTest(unittest.TestCase):
 
         self.assertLess(with_cost.final_equity, no_cost.final_equity)
 
+    def test_account_snapshots_include_unrealized_pnl_for_open_positions(self) -> None:
+        result = run_paper_session(uptrend_candles(), metadata())
+
+        open_snapshots = [snapshot for snapshot in result.account_snapshots if snapshot.open_positions]
+
+        self.assertTrue(open_snapshots)
+        self.assertTrue(any(snapshot.unrealized_pnl != 0 for snapshot in open_snapshots))
+        self.assertTrue(all(snapshot.marked_equity == snapshot.equity + snapshot.unrealized_pnl for snapshot in open_snapshots))
+
 
 if __name__ == "__main__":
     unittest.main()
